@@ -1,0 +1,123 @@
+<!-- 学生详情页 — 白色简洁风 -->
+<div class="fade-in">
+    <a href="#/students" class="inline-block text-sm text-gray-400 hover:text-blue-500 mb-4">← 返回列表</a>
+
+    <div class="panel mb-4" id="student-info-card">
+        <div class="text-center py-10 text-gray-300">加载中...</div>
+    </div>
+
+    <div class="mb-4">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-semibold text-gray-700">学科管理</h2>
+            <button onclick="showAddSubjectModal()" class="btn-primary" style="padding:6px 16px;font-size:13px;">➕ 新增学科</button>
+        </div>
+        <div class="grid grid-cols-5 gap-3" id="subject-cards">
+            <div class="text-gray-300 text-sm py-4">加载中...</div>
+        </div>
+    </div>
+
+    <div id="subject-detail-area" class="hidden">
+        <div class="flex gap-0 border-b" style="border-color:#e2e8f0;" id="subject-tabs">
+            <button class="px-4 py-2.5 text-sm font-medium text-blue-600 bg-white border border-b-0 rounded-t-lg" style="border-color:#e2e8f0; margin-bottom:-1px;" data-tab="report">📄 报告</button>
+            <button class="px-4 py-2.5 text-sm text-gray-400 hover:text-gray-600" data-tab="plan">📅 课程规划</button>
+            <button class="px-4 py-2.5 text-sm text-gray-400 hover:text-gray-600" data-tab="scores">📊 成绩</button>
+            <button class="px-4 py-2.5 text-sm text-gray-400 hover:text-gray-600" data-tab="logs">📝 沟通日志</button>
+        </div>
+        <div class="panel min-h-[200px]" style="border-radius:0 0 12px 12px; border-top:none;" id="subject-tab-content">
+            <p class="text-gray-300 text-center py-10">后续版本实现</p>
+        </div>
+    </div>
+</div>
+
+<script>
+const studentId = parseInt(location.hash.split('/')[2]);
+let currentSubjectId = null;
+
+async function loadStudentDetail() {
+    try {
+        const r = await API.students.get(studentId);
+        if (!r.success) throw new Error(r.error);
+        const s = r.data;
+        const st = Utils.statusLabel(s.status);
+        document.getElementById('student-info-card').innerHTML = `
+            <div class="flex items-start justify-between">
+                <div>
+                    <div class="flex items-center gap-3 mb-3">
+                        <h1 class="text-xl font-bold text-gray-800">${Utils.escapeHtml(s.name)}</h1>
+                        <span class="px-2 py-0.5 rounded-full text-xs ${st.cls}">${st.text}</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-x-8 gap-y-1 text-sm text-gray-500">
+                        <div>年级：${Utils.escapeHtml(s.grade)||'-'}</div>
+                        <div>学校：${Utils.escapeHtml(s.school)||'-'}</div>
+                        <div>电话：${Utils.escapeHtml(s.phone)||'-'}</div>
+                        <div>家长：${Utils.escapeHtml(s.parent_name)||'-'} ${Utils.escapeHtml(s.parent_phone)||''}</div>
+                        <div>地址：${Utils.escapeHtml(s.address)||'-'}</div>
+                        <div>来源：${Utils.escapeHtml(s.source)||'-'}</div>
+                    </div>
+                </div>
+                <button onclick="editStudentInfo()" class="text-sm text-gray-400 hover:text-blue-500">✏️ 编辑</button>
+            </div>
+            ${s.notes ? `<div class="mt-3 pt-3 border-t border-gray-100 text-sm text-gray-400">备注：${Utils.escapeHtml(s.notes)}</div>` : ''}
+        `;
+    } catch(e) {
+        document.getElementById('student-info-card').innerHTML = `<div class="text-center py-10 text-red-400">加载失败: ${e.message}</div>`;
+    }
+}
+
+async function loadSubjects() {
+    try {
+        const r = await API.subjects.list(studentId);
+        if (!r.success) throw new Error(r.error);
+        const subs = r.data;
+        const container = document.getElementById('subject-cards');
+        if (!subs.length) {
+            container.innerHTML = '<div class="col-span-5 text-gray-300 text-sm py-4">暂无学科，点击右上角新增</div>';
+            return;
+        }
+        container.innerHTML = subs.map(sub => {
+            const isActive = sub.status === 'active';
+            const icon = Utils.subjectIcon(sub.name);
+            return `<div class="subject-card ${currentSubjectId===sub.id?'active-subject':''}" onclick="selectSubject(${sub.id},'${sub.name}')">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="text-lg">${icon}</span>
+                    <span class="font-medium text-gray-700">${Utils.escapeHtml(sub.name)}</span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="${isActive?'text-green-500':'text-gray-400'}">${isActive?'● 活跃':'○ 已停用'}</span>
+                    <button onclick="event.stopPropagation();toggleSubject(${sub.id},'${sub.status}')" class="text-gray-300 hover:text-gray-500 text-xs">${isActive?'停用':'启用'}</button>
+                </div>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        document.getElementById('subject-cards').innerHTML = `<div class="text-red-400 text-sm">${e.message}</div>`;
+    }
+}
+
+function selectSubject(id, name) {
+    currentSubjectId = id;
+    document.getElementById('subject-detail-area').classList.remove('hidden');
+    document.getElementById('subject-tab-content').innerHTML = `<p class="text-gray-300 text-center py-10">已选择「${name}」，详细功能将在后续版本中实现</p>`;
+    loadSubjects();
+}
+
+function showAddSubjectModal() {
+    const name = prompt('学科名称（如：数学、英语）：');
+    if (!name) return;
+    API.subjects.create({ student_id: studentId, name }).then(r => {
+        if (r.success) { loadSubjects(); if (confirm('创建成功！是否立即开启 AI 对话？')) location.hash = `#/conversation/${r.data.id}`; }
+        else alert('失败：'+r.error);
+    });
+}
+
+async function toggleSubject(id, cur) {
+    const ns = cur === 'active' ? 'paused' : 'active';
+    if (!confirm(`确定${ns==='paused'?'停用':'启用'}该学科？`)) return;
+    try { const r = await API.subjects.updateStatus(id, ns); if (r.success) loadSubjects(); }
+    catch(e) { alert(e.message); }
+}
+
+function editStudentInfo() { alert('编辑功能将在后续版本完善'); }
+
+loadStudentDetail();
+loadStudents();
+</script>

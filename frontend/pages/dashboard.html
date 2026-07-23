@@ -1,0 +1,91 @@
+<!-- 工作台看板 — 白色简洁风 -->
+<div class="fade-in">
+    <!-- 统计卡片 -->
+    <div class="grid grid-cols-4 gap-4 mb-6">
+        <div class="stat-card">
+            <div class="stat-value" id="stat-active-students">0</div>
+            <div class="stat-label"><span class="stat-dot stat-dot-blue"></span>在读学生</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-active-subjects">0</div>
+            <div class="stat-label"><span class="stat-dot stat-dot-purple"></span>活跃学科</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-new-students">0</div>
+            <div class="stat-label"><span class="stat-dot stat-dot-pink"></span>本月新增</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-total-students">0</div>
+            <div class="stat-label"><span class="stat-dot stat-dot-amber"></span>总学生数</div>
+        </div>
+    </div>
+
+    <!-- 快捷操作 -->
+    <div class="flex gap-3 mb-6">
+        <a href="#/students" class="btn-primary" style="text-decoration:none;">➕ 新建学生</a>
+        <a href="#/teachers" class="btn-outline" style="text-decoration:none;">👨‍🏫 教师管理</a>
+        <a href="#/knowledge-base" class="btn-outline" style="text-decoration:none;">📚 知识库</a>
+    </div>
+
+    <!-- 快速开始 + 最近活动 -->
+    <div class="grid grid-cols-2 gap-4">
+        <div class="panel">
+            <div class="panel-title">📋 快速开始</div>
+            <div class="space-y-2">
+                <div class="flex items-center gap-3 text-sm text-gray-600 py-2">
+                    <span class="w-6 h-6 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-bold">1</span>
+                    在「学生档案」中新建学生
+                </div>
+                <div class="flex items-center gap-3 text-sm text-gray-600 py-2">
+                    <span class="w-6 h-6 rounded-md bg-purple-50 text-purple-500 flex items-center justify-center text-xs font-bold">2</span>
+                    为学生新增学科，开启 AI 对话采集
+                </div>
+                <div class="flex items-center gap-3 text-sm text-gray-600 py-2">
+                    <span class="w-6 h-6 rounded-md bg-pink-50 text-pink-500 flex items-center justify-center text-xs font-bold">3</span>
+                    AI 自动生成学情报告与课程规划
+                </div>
+                <div class="flex items-center gap-3 text-sm text-gray-600 py-2">
+                    <span class="w-6 h-6 rounded-md bg-amber-50 text-amber-500 flex items-center justify-center text-xs font-bold">4</span>
+                    导出 PDF 给家长，确认报名
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title">📌 最近活动</div>
+            <div class="text-sm text-gray-400" id="activity-list">
+                <div class="text-center py-10 text-gray-300">
+                    <div class="text-2xl mb-2">📭</div>
+                    <p>暂无活动记录</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(async function() {
+    try {
+        const r = await API.dashboard.stats();
+        if (r.success) {
+            const d = r.data;
+            document.getElementById('stat-active-students').textContent = d.active_students || 0;
+            document.getElementById('stat-active-subjects').textContent = d.active_subjects || 0;
+            document.getElementById('stat-new-students').textContent = d.new_students_this_month || 0;
+            document.getElementById('stat-total-students').textContent = d.total_students || 0;
+        }
+    } catch(e) { console.error(e); }
+
+    try {
+        const r = await API.dashboard.activities();
+        if (r.success && r.data.length) {
+            document.getElementById('activity-list').innerHTML = r.data.slice(0,10).map(a =>
+                `<div class="py-2.5 border-b border-gray-50 flex justify-between text-gray-500">
+                    <span>${Utils.escapeHtml(a.action)}</span>
+                    <span class="text-gray-300 text-xs">${Utils.formatDate(a.created_at, true)}</span>
+                </div>`
+            ).join('');
+        }
+    } catch(e) { console.error(e); }
+})();
+</script>

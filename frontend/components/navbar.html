@@ -1,0 +1,61 @@
+<!-- 侧边栏导航 — 白色简洁风 -->
+<nav class="sidebar h-full flex flex-col">
+    <!-- Logo -->
+    <div class="sidebar-logo-area px-5 py-4">
+        <div class="text-base font-bold text-gray-800">教培智能体</div>
+        <div class="text-xs text-gray-400 mt-0.5" id="navbar-org-name">XX教育机构</div>
+    </div>
+
+    <!-- 主导航 -->
+    <div class="flex-1 py-3 overflow-y-auto">
+        <a href="#/dashboard" data-route="/dashboard" onclick="updateNavActive(this)">
+            <span class="icon">📊</span> 工作台
+        </a>
+        <a href="#/students" data-route="/students" onclick="updateNavActive(this)">
+            <span class="icon">👥</span> 学生档案
+        </a>
+        <a href="#/teachers" data-route="/teachers" onclick="updateNavActive(this)">
+            <span class="icon">👨‍🏫</span> 教师管理
+        </a>
+        <a href="#/knowledge-base" data-route="/knowledge-base" onclick="updateNavActive(this)">
+            <span class="icon">📚</span> 知识库
+        </a>
+    </div>
+
+    <!-- 底部：系统设置 + 版本 -->
+    <div class="sidebar-footer">
+        <a href="#/settings" data-route="/settings" onclick="updateNavActive(this)" class="mb-0 mx-2" style="margin-bottom:0;">
+            <span class="icon">⚙️</span> 系统设置
+        </a>
+        <div class="px-5 py-2 text-xs text-gray-300">
+            v1.0.0 · P1
+        </div>
+    </div>
+</nav>
+
+<script>
+(function() {
+    function highlightCurrent() {
+        const hash = location.hash || '#/dashboard';
+        const basePath = '/' + hash.replace('#/', '').split('/').slice(0, 1).join('/');
+        const routeMap = {
+            '/dashboard': '/dashboard',
+            '/students': '/students', '/student': '/students',
+            '/conversation': '/students', '/report': '/students',
+            '/teachers': '/teachers',
+            '/knowledge-base': '/knowledge-base', '/knowledge': '/knowledge-base',
+            '/settings': '/settings',
+        };
+        const mapped = routeMap[basePath] || basePath;
+        document.querySelectorAll('.sidebar a').forEach(a => {
+            a.classList.toggle('active', a.dataset.route === mapped);
+        });
+    }
+    window.addEventListener('hashchange', highlightCurrent);
+    setTimeout(highlightCurrent, 100);
+    window.updateNavActive = function(el) {
+        document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
+        el.classList.add('active');
+    };
+})();
+</script>

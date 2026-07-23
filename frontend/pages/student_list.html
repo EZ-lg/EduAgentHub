@@ -1,0 +1,121 @@
+<!-- 学生列表页 — 白色简洁风 -->
+<div class="fade-in">
+    <div class="flex items-center justify-between mb-4">
+        <div class="flex gap-2">
+            <input type="text" id="student-search" placeholder="搜索姓名/电话..." class="w-56 text-sm" oninput="filterStudents()">
+            <select id="student-grade-filter" class="text-sm" onchange="filterStudents()">
+                <option value="">全部年级</option>
+                <option>小一</option><option>小二</option><option>小三</option><option>小四</option><option>小五</option><option>小六</option>
+                <option>初一</option><option>初二</option><option>初三</option>
+                <option>高一</option><option>高二</option><option>高三</option>
+            </select>
+            <select id="student-status-filter" class="text-sm" onchange="filterStudents()">
+                <option value="">全部状态</option>
+                <option value="active">在读</option>
+                <option value="completed">已结课</option>
+                <option value="abandoned">已放弃</option>
+            </select>
+        </div>
+        <button onclick="showCreateStudentModal()" class="btn-primary">➕ 新建学生</button>
+    </div>
+
+    <div class="panel overflow-hidden" style="padding:0;">
+        <table class="w-full text-sm">
+            <thead>
+                <tr>
+                    <th class="text-left px-4 py-3">姓名</th>
+                    <th class="text-left px-4 py-3">年级</th>
+                    <th class="text-left px-4 py-3">学校</th>
+                    <th class="text-left px-4 py-3">电话</th>
+                    <th class="text-left px-4 py-3">学科数</th>
+                    <th class="text-left px-4 py-3">状态</th>
+                    <th class="text-left px-4 py-3">更新时间</th>
+                    <th class="text-right px-4 py-3">操作</th>
+                </tr>
+            </thead>
+            <tbody id="student-table-body">
+                <tr><td colspan="8" class="text-center py-10 text-gray-300">加载中...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="flex items-center justify-between mt-3 text-sm text-gray-400" id="student-pagination"></div>
+</div>
+
+<script>
+let studentPage = 1, studentTotal = 0;
+
+async function loadStudents() {
+    const search = document.getElementById('student-search')?.value || '';
+    const grade = document.getElementById('student-grade-filter')?.value || '';
+    const status = document.getElementById('student-status-filter')?.value || '';
+    try {
+        const resp = await API.students.list({ search, grade, status, page: studentPage, page_size: 15 });
+        if (resp.success) { studentTotal = resp.data.total; renderTable(resp.data.items); renderPagination(); }
+    } catch(e) {
+        document.getElementById('student-table-body').innerHTML = `<tr><td colspan="8" class="text-center py-10 text-red-400">加载失败: ${e.message}</td></tr>`;
+    }
+}
+
+function renderTable(items) {
+    const tbody = document.getElementById('student-table-body');
+    if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-10 text-gray-300">暂无学生，点击右上角新建</td></tr>';
+        return;
+    }
+    tbody.innerHTML = items.map(s => {
+        const st = Utils.statusLabel(s.status);
+        return `<tr class="cursor-pointer" onclick="location.hash='#/student/${s.id}'">
+            <td class="px-4 py-3 font-medium text-gray-800">${Utils.escapeHtml(s.name)}</td>
+            <td class="px-4 py-3 text-gray-600">${Utils.escapeHtml(s.grade)}</td>
+            <td class="px-4 py-3 text-gray-500">${Utils.escapeHtml(s.school)}</td>
+            <td class="px-4 py-3 text-gray-500">${Utils.escapeHtml(s.phone)}</td>
+            <td class="px-4 py-3 text-gray-400">-</td>
+            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-full text-xs ${st.cls}">${st.text}</span></td>
+            <td class="px-4 py-3 text-gray-300 text-xs">${Utils.formatDate(s.updated_at)}</td>
+            <td class="px-4 py-3 text-right">
+                <button onclick="event.stopPropagation();editStudent(${s.id})" class="text-blue-500 hover:text-blue-700 mr-2">✏️</button>
+                <button onclick="event.stopPropagation();deleteStudentConfirm(${s.id})" class="text-gray-300 hover:text-red-500">🗑️</button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function renderPagination() {
+    const totalPages = Math.ceil(studentTotal / 15);
+    document.getElementById('student-pagination').innerHTML = totalPages > 1
+        ? `<span>共 ${studentTotal} 条 · ${studentPage}/${totalPages}</span>
+           <div class="flex gap-1">
+               <button onclick="studentPage=Math.max(1,studentPage-1);loadStudents()" class="px-2 py-1 border rounded text-xs hover:border-gray-400" ${studentPage<=1?'disabled':''}>‹ 上一页</button>
+               <button onclick="studentPage=Math.min(${totalPages},studentPage+1);loadStudents()" class="px-2 py-1 border rounded text-xs hover:border-gray-400" ${studentPage>=totalPages?'disabled':''}>下一页 ›</button>
+           </div>`
+        : `<span>共 ${studentTotal} 条</span>`;
+}
+
+function filterStudents() { studentPage = 1; loadStudents(); }
+
+function showCreateStudentModal() {
+    const name = prompt('学生姓名：'); if (!name) return;
+    const grade = prompt('年级（如：初二）：') || '';
+    const school = prompt('学校：') || '';
+    const phone = prompt('电话：') || '';
+    API.students.create({ name, grade, school, phone }).then(r => {
+        if (r.success) { alert('创建成功！'); loadStudents(); }
+        else alert('失败：'+r.error);
+    }).catch(e => alert('失败：'+e.message));
+}
+
+function editStudent(id) {
+    const name = prompt('姓名：'); if (!name) return;
+    const grade = prompt('年级：') || '';
+    API.students.update(id, { name, grade }).then(r => { if (r.success) loadStudents(); });
+}
+
+function deleteStudentConfirm(id) {
+    if (confirm('确定删除？所有学科及关联数据将被永久删除。')) {
+        API.students.delete(id).then(r => { if (r.success) loadStudents(); });
+    }
+}
+
+loadStudents();
+</script>
