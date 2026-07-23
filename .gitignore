@@ -1,0 +1,29 @@
+# IDE
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.spec
+venv/
+.venv/
+
+# 运行时数据（不提交）
+data/tutoring.db
+data/chroma_data/
+data/uploads/*
+data/exports/*
+!data/uploads/.gitkeep
+!data/exports/.gitkeep
+
+# OS
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# 环境变量
+.env
+.env.local
