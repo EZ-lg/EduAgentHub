@@ -1,0 +1,2 @@
+# 成绩分析 Prompt — P6 阶段完善
+# 变量：subject_name, scores（成绩数组）, kb_context（可选）

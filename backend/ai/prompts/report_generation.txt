@@ -1,0 +1,2 @@
+# 报告生成 Prompt — P5 阶段完善
+# 变量：student_info, subject_name, conversation_summary, kb_context（可选）

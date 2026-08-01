@@ -1,0 +1,2 @@
+# AI 对话式采集 Prompt — P4 阶段完善
+# 变量：student_name, subject_name, history（消息列表）, subjects_info

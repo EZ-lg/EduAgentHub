@@ -1,0 +1,2 @@
+# 课程规划调整 Prompt — P6 阶段完善
+# 变量：current_plan（JSON）, score_analysis, kb_context（可选）

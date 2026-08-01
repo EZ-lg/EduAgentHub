@@ -1,0 +1,2 @@
+# 报告重新生成 Prompt（带补充信息）— P5 阶段完善
+# 变量：original_content, extra_info, section（可选）

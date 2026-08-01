@@ -25,6 +25,8 @@ function showToast(message, type = 'info') {
         store.toasts = store.toasts.filter(t => t.id !== id);
     }, 3000);
 }
+// 暴露给页面内联脚本使用（页面模板通过 v-html 注入，不在 Vue 组件内）
+window.showToast = showToast;
 
 // ============================================================
 // 页面模板缓存（fetch 加载 HTML 片段）
@@ -45,6 +47,23 @@ async function loadTemplate(name) {
     }
 }
 
+// 执行容器内所有 <script> 块
+// 说明：v-html / innerHTML 注入的脚本不会被浏览器自动执行，
+// 必须手动重建 script 节点才能触发。页面模板普遍依赖此机制。
+function executeInlineScripts(container) {
+    if (!container) return;
+    container.querySelectorAll('script').forEach(oldScript => {
+        const newScript = document.createElement('script');
+        if (oldScript.src) {
+            newScript.src = oldScript.src;
+            newScript.async = true;
+        } else {
+            newScript.textContent = oldScript.textContent;
+        }
+        oldScript.replaceWith(newScript);
+    });
+}
+
 // 创建一个通用页面组件工厂
 function createPageComponent(pageName, title) {
     return {
@@ -58,6 +77,8 @@ function createPageComponent(pageName, title) {
             // 触发 Vue 编译内联模板（如果页面包含 Vue 指令）
             await nextTick();
             this.$forceUpdate();
+            // 执行页面内联脚本（innerHTML 不会自动执行 <script>）
+            executeInlineScripts(this.$el);
         },
     };
 }

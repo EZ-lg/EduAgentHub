@@ -1,0 +1,2 @@
+# 知识库智能问答 Prompt — P8 阶段完善
+# 变量：question, kb_context（检索结果）

@@ -1,9 +1,345 @@
-<!-- 系统设置页 -->
+<!-- 系统设置页 — 白色简洁风 -->
 <div class="fade-in">
-    <div class="text-center py-12 text-gray-400">
-        <div class="text-4xl mb-4">⚙️</div>
-        <p class="text-lg mb-2">系统设置</p>
-        <p class="text-sm">此功能将在 P2 阶段实现</p>
-        <p class="text-xs text-gray-300 mt-4">LLM 配置 + Embedding 配置 + 机构信息 + 报告风格 + 数据管理</p>
+    <!-- Tab 导航 -->
+    <div class="flex gap-1 mb-5 border-b" style="border-color:#f1f5f9;">
+        <button class="settings-tab active" data-tab="ai" onclick="switchSettingsTab('ai')">🤖 AI 配置</button>
+        <button class="settings-tab" data-tab="org" onclick="switchSettingsTab('org')">🏢 机构信息</button>
+        <button class="settings-tab" data-tab="data" onclick="switchSettingsTab('data')">💾 数据管理</button>
+        <button class="settings-tab" data-tab="about" onclick="switchSettingsTab('about')">ℹ️ 关于</button>
+    </div>
+
+    <!-- ============ AI 配置 ============ -->
+    <div id="settings-tab-ai" class="settings-tab-panel">
+        <div id="page-error" class="hidden mb-4 px-4 py-3 rounded-lg bg-red-50 text-red-600 text-sm border border-red-100"></div>
+        <div class="grid grid-cols-2 gap-4 items-start">
+
+            <!-- LLM 配置 -->
+            <div class="panel">
+                <div class="panel-title">🧠 大模型配置 <span class="text-xs font-normal text-gray-400">(LLM · 对话/生成)</span></div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="settings-label">提供商</label>
+                        <select id="llm-provider" class="w-full" onchange="onLLMProviderChange()">
+                            <option value="">加载中...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="settings-label">API Key</label>
+                        <div class="relative">
+                            <input type="password" id="llm-api-key" class="w-full pr-14" placeholder="sk-..." autocomplete="off">
+                            <button type="button" onclick="toggleKey('llm-api-key', this)" class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600">显示</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="settings-label">Base URL <span class="font-normal">(留空用默认地址)</span></label>
+                        <input type="text" id="llm-base-url" class="w-full" placeholder="https://...">
+                    </div>
+                    <div>
+                        <label class="settings-label">模型名</label>
+                        <input type="text" id="llm-model-name" class="w-full" list="llm-models" placeholder="gpt-4o">
+                        <datalist id="llm-models"></datalist>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="settings-label">温度 <span id="llm-temperature-val" class="text-gray-400">0.7</span></label>
+                            <input type="range" id="llm-temperature" min="0" max="2" step="0.1" value="0.7"
+                                   class="w-full" style="padding:0;border:none;box-shadow:none;"
+                                   oninput="document.getElementById('llm-temperature-val').textContent = this.value">
+                        </div>
+                        <div>
+                            <label class="settings-label">最大 Token</label>
+                            <input type="number" id="llm-max-tokens" class="w-full" value="4096" min="1" step="1">
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="btn-outline" onclick="testLLM()">🔌 测试连接</button>
+                        <button class="btn-primary" onclick="saveLLM()">💾 保存配置</button>
+                    </div>
+                    <div class="text-xs text-gray-300">测试使用当前表单配置，无需先保存</div>
+                    <div id="llm-test-result" class="text-sm"></div>
+                </div>
+            </div>
+
+            <!-- Embedding 配置 -->
+            <div class="panel">
+                <div class="panel-title">🔤 向量模型配置 <span class="text-xs font-normal text-gray-400">(Embedding · 知识库检索)</span></div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="settings-label">提供商</label>
+                        <select id="emb-provider" class="w-full" onchange="onEmbProviderChange()">
+                            <option value="">加载中...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="settings-label">API Key</label>
+                        <div class="relative">
+                            <input type="password" id="emb-api-key" class="w-full pr-14" placeholder="sk-..." autocomplete="off">
+                            <button type="button" onclick="toggleKey('emb-api-key', this)" class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600">显示</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="settings-label">Base URL <span class="font-normal">(留空用默认地址)</span></label>
+                        <input type="text" id="emb-base-url" class="w-full" placeholder="https://...">
+                    </div>
+                    <div>
+                        <label class="settings-label">模型名</label>
+                        <input type="text" id="emb-model-name" class="w-full" list="emb-models" placeholder="text-embedding-3-small">
+                        <datalist id="emb-models"></datalist>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="btn-outline" onclick="testEmbed()">🔌 测试连接</button>
+                        <button class="btn-primary" onclick="saveEmbed()">💾 保存配置</button>
+                    </div>
+                    <div class="text-xs text-amber-500/80">⚠️ 切换 Embedding 模型后，需在「知识库」重新入库向量（P8 实现）</div>
+                    <div id="emb-test-result" class="text-sm"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ 机构信息 ============ -->
+    <div id="settings-tab-org" class="settings-tab-panel hidden">
+        <div class="panel">
+            <div class="panel-title">🏢 机构信息</div>
+            <div class="text-center py-10 text-gray-300">
+                <div class="text-2xl mb-2">🏫</div>
+                <p>此模块将在后续阶段实现</p>
+                <p class="text-xs text-gray-300 mt-2">机构名称 / 地址 / 电话 / Logo（用于 PDF 抬头）</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ 数据管理 ============ -->
+    <div id="settings-tab-data" class="settings-tab-panel hidden">
+        <div class="panel">
+            <div class="panel-title">💾 数据管理</div>
+            <div class="text-center py-10 text-gray-300">
+                <div class="text-2xl mb-2">🗄️</div>
+                <p>此模块将在后续阶段实现</p>
+                <p class="text-xs text-gray-300 mt-2">备份数据库 / 恢复数据库 / 清空数据</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ 关于 ============ -->
+    <div id="settings-tab-about" class="settings-tab-panel hidden">
+        <div class="panel">
+            <div class="panel-title">ℹ️ 关于</div>
+            <div class="text-center py-8">
+                <div class="text-3xl mb-2">📚</div>
+                <div class="text-lg font-bold text-gray-800">教培智能体</div>
+                <div class="text-xs text-gray-400 mt-1">v1.0.0 · P2 AI 服务层</div>
+                <div class="text-xs text-gray-300 mt-4 leading-relaxed">
+                    教培机构一站式学员管理及 AI 助学工具<br>
+                    FastAPI + SQLite + ChromaDB + Vue 3 · 本地运行，数据不出电脑
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+
+<script>
+/* ============================================================
+   系统设置页逻辑 — LLM / Embedding 配置
+   ============================================================ */
+let PROVIDER_META = {};   // provider 元信息缓存
+
+/* 全局错误可见化：脚本里任何报错都显示出来，便于排查 */
+window.addEventListener('error', function (e) {
+    console.error('页面脚本错误:', e.message);
+    showPageError('页面脚本出错：' + e.message);
+});
+function showPageError(msg) {
+    const box = document.getElementById('page-error');
+    if (box) {
+        box.classList.remove('hidden');
+        box.innerHTML = '⚠️ ' + (msg || '未知错误') +
+            '<button type="button" class="ml-2 text-xs underline" onclick="this.parentElement.classList.add(\'hidden\')">关闭</button>';
+    }
+}
+
+/* ---------- 初始化 ---------- */
+async function initSettings() {
+    try {
+        const r = await API.settings.providers();
+        if (r.success) PROVIDER_META = r.data.providers || {};
+        if (!Object.keys(PROVIDER_META).length) {
+            showPageError('未获取到 Provider 列表，请确认后端服务正常');
+        }
+    } catch (e) {
+        console.error('加载 Provider 元信息失败', e);
+        showPageError('加载 Provider 列表失败：' + e.message);
+        return;   // 列表没加载成功，后面的回填没有意义
+    }
+    await loadSavedConfig();
+}
+
+async function loadSavedConfig() {
+    let cfg = {};
+    try {
+        const r = await API.settings.getAll();
+        if (r.success) cfg = r.data;
+    } catch (e) { console.error('加载已保存配置失败', e); }
+
+    buildProviderSelects();
+    fillLLMForm(cfg.llm_config || {});
+    fillEmbForm(cfg.embedding_config || {});
+}
+
+function buildProviderSelects() {
+    const entries = Object.entries(PROVIDER_META);
+    // LLM 下拉：全部 Provider
+    document.getElementById('llm-provider').innerHTML =
+        '<option value="">请选择提供商</option>' +
+        entries.map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+    // Embedding 下拉：仅支持 Embedding 的
+    document.getElementById('emb-provider').innerHTML =
+        '<option value="">请选择提供商</option>' +
+        entries.filter(([, v]) => v.supports_embedding)
+               .map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+}
+
+function providerMeta(name) { return PROVIDER_META[name] || null; }
+
+/* ---------- 切换 Provider：填默认地址 + 模型候选 ---------- */
+function onLLMProviderChange() {
+    const meta = providerMeta(document.getElementById('llm-provider').value);
+    if (!meta) return;
+    if (meta.default_base_url) document.getElementById('llm-base-url').value = meta.default_base_url;
+    document.getElementById('llm-models').innerHTML =
+        (meta.default_models || []).map(m => `<option value="${m}"></option>`).join('');
+}
+
+function onEmbProviderChange() {
+    const meta = providerMeta(document.getElementById('emb-provider').value);
+    if (!meta) return;
+    if (meta.default_base_url) document.getElementById('emb-base-url').value = meta.default_base_url;
+    document.getElementById('emb-models').innerHTML =
+        (meta.default_embedding_models || []).map(m => `<option value="${m}"></option>`).join('');
+}
+
+/* ---------- 回填已保存配置 ---------- */
+function fillLLMForm(llm) {
+    if (llm.provider) {
+        document.getElementById('llm-provider').value = llm.provider;
+        onLLMProviderChange();
+    }
+    if (llm.base_url) document.getElementById('llm-base-url').value = llm.base_url;
+    if (llm.api_key) document.getElementById('llm-api-key').value = llm.api_key;
+    if (llm.model_name) document.getElementById('llm-model-name').value = llm.model_name;
+    if (llm.temperature != null) {
+        document.getElementById('llm-temperature').value = llm.temperature;
+        document.getElementById('llm-temperature-val').textContent = llm.temperature;
+    }
+    if (llm.max_tokens) document.getElementById('llm-max-tokens').value = llm.max_tokens;
+}
+
+function fillEmbForm(emb) {
+    if (emb.provider) {
+        document.getElementById('emb-provider').value = emb.provider;
+        onEmbProviderChange();
+    }
+    if (emb.base_url) document.getElementById('emb-base-url').value = emb.base_url;
+    if (emb.api_key) document.getElementById('emb-api-key').value = emb.api_key;
+    if (emb.model_name) document.getElementById('emb-model-name').value = emb.model_name;
+}
+
+/* ---------- 收集表单 ---------- */
+function gatherLLM() {
+    return {
+        provider: document.getElementById('llm-provider').value,
+        api_key: document.getElementById('llm-api-key').value.trim(),
+        base_url: document.getElementById('llm-base-url').value.trim(),
+        model_name: document.getElementById('llm-model-name').value.trim(),
+        temperature: parseFloat(document.getElementById('llm-temperature').value),
+        max_tokens: parseInt(document.getElementById('llm-max-tokens').value) || 4096,
+    };
+}
+
+function gatherEmb() {
+    return {
+        provider: document.getElementById('emb-provider').value,
+        api_key: document.getElementById('emb-api-key').value.trim(),
+        base_url: document.getElementById('emb-base-url').value.trim(),
+        model_name: document.getElementById('emb-model-name').value.trim(),
+    };
+}
+
+/* ---------- 测试连接 ---------- */
+async function testLLM() {
+    await runTest('llm');
+}
+async function testEmbed() {
+    await runTest('emb');
+}
+
+async function runTest(kind) {
+    const cfg = kind === 'llm' ? gatherLLM() : gatherEmb();
+    const box = document.getElementById(kind + '-test-result');
+    if (!cfg.provider) { renderTestResult(box, { ok: false, message: '请先选择提供商' }); return; }
+    renderTestResult(box, { ok: true, message: '测试中，请稍候...', pending: true });
+    try {
+        const r = kind === 'llm' ? await API.settings.testLLM(cfg) : await API.settings.testEmbed(cfg);
+        renderTestResult(box, r.success ? r.data : { ok: false, message: r.error || '请求失败' });
+    } catch (e) {
+        renderTestResult(box, { ok: false, message: e.message });
+    }
+}
+
+function renderTestResult(box, res) {
+    if (!box) return;
+    if (res.pending) {
+        box.className = 'text-sm text-gray-400';
+        box.innerHTML = '⏳ ' + (res.message || '测试中...');
+        return;
+    }
+    const ms = res.latency_ms ? ` · ${res.latency_ms}ms` : '';
+    if (res.ok) {
+        box.className = 'text-sm text-green-600';
+        box.innerHTML = `✅ ${res.message || '连接成功'}${ms}`;
+    } else {
+        box.className = 'text-sm text-red-500';
+        box.innerHTML = `❌ ${res.message || '连接失败'}${ms}`;
+    }
+}
+
+/* ---------- 保存配置 ---------- */
+async function saveLLM() {
+    const cfg = gatherLLM();
+    if (!cfg.provider) { alert('请先选择提供商'); return; }
+    try {
+        const r = await API.settings.update({ llm_config: cfg });
+        if (r.success) { showToast('LLM 配置已保存', 'success'); }
+        else alert('保存失败：' + (r.error || '未知错误'));
+    } catch (e) { alert('保存失败：' + e.message); }
+}
+
+async function saveEmbed() {
+    const cfg = gatherEmb();
+    if (!cfg.provider) { alert('请先选择提供商'); return; }
+    try {
+        const r = await API.settings.update({ embedding_config: cfg });
+        if (r.success) { showToast('Embedding 配置已保存', 'success'); }
+        else alert('保存失败：' + (r.error || '未知错误'));
+    } catch (e) { alert('保存失败：' + e.message); }
+}
+
+/* ---------- 工具 ---------- */
+function switchSettingsTab(name) {
+    document.querySelectorAll('.settings-tab').forEach(b => {
+        b.classList.toggle('active', b.dataset.tab === name);
+    });
+    document.querySelectorAll('.settings-tab-panel').forEach(p => p.classList.add('hidden'));
+    const el = document.getElementById('settings-tab-' + name);
+    if (el) el.classList.remove('hidden');
+}
+
+function toggleKey(inputId, btn) {
+    const input = document.getElementById(inputId);
+    const isPwd = input.type === 'password';
+    input.type = isPwd ? 'text' : 'password';
+    btn.textContent = isPwd ? '隐藏' : '显示';
+}
+
+initSettings();
+</script>

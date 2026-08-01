@@ -193,9 +193,13 @@ tutoring-agent/
 
 ### AI 配置
 - LLM 和 Embedding 配置独立，存在 `settings` 表中
-- key: `llm_config`，value_json: `{"provider": "openai", "api_key": "...", "model_name": "gpt-4o", ...}`
-- key: `embedding_config`，value_json: `{"provider": "openai", "api_key": "...", "model_name": "text-embedding-3-small", ...}`
-- 设置页提供"测试连接"按钮
+- key: `llm_config`，value_json: `{"provider": "openai", "api_key": "...", "base_url": "...", "model_name": "gpt-4o", "temperature": 0.7, "max_tokens": 4096, ...}`
+- key: `embedding_config`，value_json: `{"provider": "openai", "api_key": "...", "base_url": "...", "model_name": "text-embedding-3-small", ...}`
+- Provider 5 个：`openai` / `deepseek` / `claude` / `qwen` / `custom_openai`（后三者及自定义为 OpenAI 兼容协议）
+- 通过 `backend/ai/manager.py` 的 `ai_manager` 单例获取 Provider，不要直接 new
+- 新增 Provider：在 `backend/ai/providers/` 建类 → 在 `providers/__init__.py` 导入 → 在 `factory.py` 的 `PROVIDER_CLASSES` 登记
+- AI 调用统一走 `AIManager`，配置变更后调用 `ai_manager.reload_config()`
+- 设置页提供"测试连接"按钮，用当前表单配置测试（无需先保存）
 - 切换 Embedding 需提示重建知识库
 
 ### 打包
@@ -210,8 +214,8 @@ tutoring-agent/
 
 | 阶段 | 状态 | 内容 |
 |------|------|------|
-| P1 项目骨架 | ⬜ 待开发 | FastAPI + SQLite建表 + 前端骨架 + 导航 |
-| P2 AI 服务层 | ⬜ 待开发 | BaseLLMProvider + Provider×2 + AIManager + 设置页AI配置 |
+| P1 项目骨架 | ✅ 已完成 | FastAPI + SQLite建表 + 前端骨架 + 导航 |
+| P2 AI 服务层 | ✅ 已完成 | BaseLLMProvider + Provider×5 + AIManager + 设置页AI配置 |
 | P3 学生档案+学科 | ⬜ 待开发 | 学生CRUD + 学科增删/停用 + 详情页 |
 | P4 AI对话采集 | ⬜ 待开发 | 对话UI + 消息API + AI追问 + 结束判断 |
 | P5 报告生成导出 | ⬜ 待开发 | Prompt模板 + 报告预览/编辑 + 重新生成 + PDF导出 |
@@ -237,6 +241,7 @@ tutoring-agent/
 
 ```bash
 pip install -r requirements.txt
+venv/Scripts/activate   # 激活虚拟环境                                                                   
 python main.py
 # → 浏览器自动打开 http://127.0.0.1:8888
 ```

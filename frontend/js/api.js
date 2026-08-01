@@ -117,6 +117,7 @@ window.API = {
     // === 设置 ===
     settings: {
         getAll() { return API.get('/api/settings'); },
+        providers() { return API.get('/api/settings/providers'); },
         update(data) { return API.put('/api/settings', data); },
         testLLM(data) { return API.post('/api/settings/test-llm', data || {}); },
         testEmbed(data) { return API.post('/api/settings/test-embed', data || {}); },
