@@ -4,6 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>教培智能体</title>
+    <script>
+    // ===== 前端版本自愈机制：每次改动前端代码后递增 APP_VERSION，浏览器自动强制刷新一次 =====
+    // 配合后端 no-store 缓存策略，保证用户永远加载到最新代码，无需手动清缓存
+    window.APP_VERSION = '7';
+    (function () {
+        try {
+            var saved = localStorage.getItem('ta_app_ver');
+            if (saved !== window.APP_VERSION) {
+                localStorage.setItem('ta_app_ver', window.APP_VERSION);
+                location.reload();
+            }
+        } catch (e) { /* localStorage 不可用则跳过自愈 */ }
+    })();
+    // 兼容 bfcache/后台恢复的旧标签页：版本变了自动刷新
+    window.addEventListener('pageshow', function (e) {
+        try {
+            if (e.persisted || localStorage.getItem('ta_app_ver') !== window.APP_VERSION) {
+                localStorage.setItem('ta_app_ver', window.APP_VERSION);
+                location.reload();
+            }
+        } catch (err) {}
+    });
+    </script>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Vue 3 -->
@@ -13,7 +36,7 @@
     <!-- ECharts 5 -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
     <!-- 自定义样式（v 为版本号，改动前端后递增，强制浏览器刷新缓存） -->
-    <link rel="stylesheet" href="css/style.css?v=2">
+    <link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
     <div id="app">
@@ -26,7 +49,10 @@
                 <!-- 顶部栏 -->
                 <header class="bg-white border-b px-6 py-3 flex items-center justify-between" style="border-color: #f1f5f9;">
                     <h1 class="text-base font-bold text-gray-800" id="page-title">工作台</h1>
-                    <div class="text-xs text-gray-400" id="header-info"></div>
+                    <div class="flex items-center gap-4">
+                        <button onclick="window.refreshPage && refreshPage()" class="text-xs text-gray-400 hover:text-blue-500 transition" title="刷新当前页面数据">↻ 刷新</button>
+                        <div class="text-xs text-gray-400" id="header-info"></div>
+                    </div>
                 </header>
 
                 <!-- 页面内容 -->
@@ -39,8 +65,8 @@
 
     <toast-widget></toast-widget>
 
-    <script src="js/utils.js?v=2"></script>
-    <script src="js/api.js?v=2"></script>
-    <script src="js/app.js?v=2"></script>
+    <script src="js/utils.js?v=7"></script>
+    <script src="js/api.js?v=7"></script>
+    <script src="js/app.js?v=7"></script>
 </body>
 </html>

@@ -31,6 +31,19 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # 前端静态资源完全禁止缓存（no-store），避免浏览器用旧文件导致页面 JS 失效
+    # no-cache 只要求"重新校验"，某些浏览器/场景仍会命中旧缓存，故升级为 no-store
+    # 配合 index.html 里的版本自愈脚本，改代码后浏览器自动强制刷新，用户无需手动清缓存
+    @app.middleware("http")
+    async def no_cache_frontend(request, call_next):
+        response = await call_next(request)
+        path = request.url.path
+        if (path in ("/", "/index.html")
+                or path.endswith((".html", ".js", ".css"))
+                or path.startswith(("/pages/", "/js/", "/css/", "/components/"))):
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
     # 注册 API 路由
     app.include_router(students.router)
     app.include_router(subjects.router)

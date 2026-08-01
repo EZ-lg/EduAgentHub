@@ -36,7 +36,9 @@ const templateCache = {};
 async function loadTemplate(name) {
     if (templateCache[name]) return templateCache[name];
     try {
-        const resp = await fetch(`/pages/${name}.html`);
+        // 带版本号请求，配合后端 no-store，杜绝浏览器缓存旧页面
+        const ver = window.APP_VERSION || '';
+        const resp = await fetch(`/pages/${name}.html?v=${ver}`);
         if (!resp.ok) throw new Error(`Failed to load ${name}`);
         const html = await resp.text();
         templateCache[name] = html;
@@ -62,7 +64,25 @@ function executeInlineScripts(container) {
         }
         oldScript.replaceWith(newScript);
     });
+    // 脚本执行成功，重置加载看门狗的重载标记
+    try { sessionStorage.removeItem('ta_wdog'); } catch (e) {}
 }
+
+// ============================================================
+// 全局刷新机制
+// 页面脚本末尾注册 window.currentPageRefresh（如 loadStudents），
+// 顶部「↻ 刷新」按钮和切回标签页时自动调用，无需手动 F5
+// ============================================================
+window.refreshPage = function () {
+    try { if (typeof window.currentPageRefresh === 'function') window.currentPageRefresh(); }
+    catch (e) { console.error('刷新失败:', e); }
+};
+
+document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') {
+        window.refreshPage();
+    }
+});
 
 // 创建一个通用页面组件工厂
 function createPageComponent(pageName, title) {
@@ -79,6 +99,23 @@ function createPageComponent(pageName, title) {
             this.$forceUpdate();
             // 执行页面内联脚本（innerHTML 不会自动执行 <script>）
             executeInlineScripts(this.$el);
+
+            // 加载看门狗：页面卡在"加载中"超过 6 秒则自动重试/刷新，无需用户手动 F5
+            setTimeout(() => {
+                try {
+                    if (!this.$el || !this.$el.isConnected) return;
+                    if (this.$el.textContent.includes('加载中')) {
+                        if (typeof window.currentPageRefresh === 'function') {
+                            // 脚本已执行但数据没回来 → 重试当前页刷新
+                            window.currentPageRefresh();
+                        } else if (sessionStorage.getItem('ta_wdog') !== '1') {
+                            // 脚本压根没执行（旧缓存代码）→ 强制刷新一次
+                            sessionStorage.setItem('ta_wdog', '1');
+                            location.reload();
+                        }
+                    }
+                } catch (e) { console.error('看门狗异常:', e); }
+            }, 6000);
         },
     };
 }

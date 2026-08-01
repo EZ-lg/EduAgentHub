@@ -9,7 +9,10 @@
     <div class="mb-4">
         <div class="flex items-center justify-between mb-3">
             <h2 class="text-sm font-semibold text-gray-700">学科管理</h2>
-            <button onclick="showAddSubjectModal()" class="btn-primary" style="padding:6px 16px;font-size:13px;">➕ 新增学科</button>
+            <div class="flex gap-2">
+                <button onclick="refreshStudentDetail()" class="btn-outline" style="padding:6px 16px;font-size:13px;" title="刷新当前页数据">↻ 刷新</button>
+                <button onclick="showAddSubjectModal()" class="btn-primary" style="padding:6px 16px;font-size:13px;">➕ 新增学科</button>
+            </div>
         </div>
         <div class="grid grid-cols-5 gap-3" id="subject-cards">
             <div class="text-gray-300 text-sm py-4">加载中...</div>
@@ -18,21 +21,40 @@
 
     <div id="subject-detail-area" class="hidden">
         <div class="flex gap-0 border-b" style="border-color:#e2e8f0;" id="subject-tabs">
-            <button class="px-4 py-2.5 text-sm font-medium text-blue-600 bg-white border border-b-0 rounded-t-lg" style="border-color:#e2e8f0; margin-bottom:-1px;" data-tab="report">📄 报告</button>
-            <button class="px-4 py-2.5 text-sm text-gray-400 hover:text-gray-600" data-tab="plan">📅 课程规划</button>
-            <button class="px-4 py-2.5 text-sm text-gray-400 hover:text-gray-600" data-tab="scores">📊 成绩</button>
-            <button class="px-4 py-2.5 text-sm text-gray-400 hover:text-gray-600" data-tab="logs">📝 沟通日志</button>
+            <button class="px-4 py-2.5 text-sm font-medium text-blue-600 bg-white border border-b-0 rounded-t-lg" style="border-color:#e2e8f0; margin-bottom:-1px;" data-tab="report" onclick="switchSubjectTab('report')">📄 报告</button>
+            <button class="px-4 py-2.5 text-sm text-gray-400 hover:text-gray-600" data-tab="plan" onclick="switchSubjectTab('plan')">📅 课程规划</button>
+            <button class="px-4 py-2.5 text-sm text-gray-400 hover:text-gray-600" data-tab="scores" onclick="switchSubjectTab('scores')">📊 成绩</button>
+            <button class="px-4 py-2.5 text-sm text-gray-400 hover:text-gray-600" data-tab="logs" onclick="switchSubjectTab('logs')">📝 沟通日志</button>
         </div>
         <div class="panel min-h-[200px]" style="border-radius:0 0 12px 12px; border-top:none;" id="subject-tab-content">
-            <p class="text-gray-300 text-center py-10">后续版本实现</p>
+            <p class="text-gray-300 text-center py-10">加载中...</p>
         </div>
     </div>
 </div>
 
 <script>
-const studentId = parseInt(location.hash.split('/')[2]);
-let currentSubjectId = null;
+const hashParts = location.hash.split('/');
+const studentId = parseInt(hashParts[2]);
+const routeSubjectId = hashParts[4] ? parseInt(hashParts[4]) : null;
+let currentSubjectId = routeSubjectId;
 
+/* ---------- 学生表单字段（编辑用，两列填表式） ---------- */
+function studentFields() {
+    return [
+        { key: 'name', label: '姓名', required: true, placeholder: '学生姓名', section: '基本信息' },
+        { key: 'gender', label: '性别', type: 'select', options: [{ v: '', label: '请选择' }, { v: '男', label: '男' }, { v: '女', label: '女' }], section: '基本信息' },
+        { key: 'grade', label: '年级', type: 'select', options: [{ v: '', label: '请选择' }].concat(Utils.grades.map(g => ({ v: g, label: g }))), section: '基本信息' },
+        { key: 'school', label: '学校', placeholder: '就读学校', section: '基本信息' },
+        { key: 'phone', label: '学生电话', placeholder: '联系电话', section: '联系方式' },
+        { key: 'parent_name', label: '家长姓名', section: '联系方式' },
+        { key: 'parent_phone', label: '家长电话', section: '联系方式' },
+        { key: 'address', label: '家庭地址', placeholder: '家庭住址', section: '其他信息', full: true },
+        { key: 'source', label: '来源渠道', placeholder: '转介绍 / 地推 / 线上', section: '其他信息' },
+        { key: 'status', label: '状态', type: 'select', options: [{ v: 'active', label: '在读' }, { v: 'completed', label: '已结课' }, { v: 'abandoned', label: '已放弃' }], section: '其他信息' },
+    ];
+}
+
+/* ---------- 学生信息卡 ---------- */
 async function loadStudentDetail() {
     try {
         const r = await API.students.get(studentId);
@@ -47,28 +69,87 @@ async function loadStudentDetail() {
                         <span class="px-2 py-0.5 rounded-full text-xs ${st.cls}">${st.text}</span>
                     </div>
                     <div class="grid grid-cols-2 gap-x-8 gap-y-1 text-sm text-gray-500">
-                        <div>年级：${Utils.escapeHtml(s.grade)||'-'}</div>
-                        <div>学校：${Utils.escapeHtml(s.school)||'-'}</div>
-                        <div>电话：${Utils.escapeHtml(s.phone)||'-'}</div>
-                        <div>家长：${Utils.escapeHtml(s.parent_name)||'-'} ${Utils.escapeHtml(s.parent_phone)||''}</div>
-                        <div>地址：${Utils.escapeHtml(s.address)||'-'}</div>
-                        <div>来源：${Utils.escapeHtml(s.source)||'-'}</div>
+                        <div>性别：${Utils.escapeHtml(s.gender) || '-'}</div>
+                        <div>年级：${Utils.escapeHtml(s.grade) || '-'}</div>
+                        <div>学校：${Utils.escapeHtml(s.school) || '-'}</div>
+                        <div>电话：${Utils.escapeHtml(s.phone) || '-'}</div>
+                        <div>家长：${Utils.escapeHtml(s.parent_name) || '-'} ${Utils.escapeHtml(s.parent_phone) || ''}</div>
+                        <div>地址：${Utils.escapeHtml(s.address) || '-'}</div>
+                        <div>来源：${Utils.escapeHtml(s.source) || '-'}</div>
+                        <div>建档：${Utils.formatDate(s.created_at)}</div>
+                    </div>
+                    ${s.notes ? `<div class="mt-3 pt-3 border-t border-gray-100 text-sm text-gray-400">备注：${Utils.escapeHtml(s.notes)}</div>` : ''}
+                </div>
+                <div class="flex flex-col items-end gap-2">
+                    <select onchange="changeStudentStatus(this.value)" class="text-xs py-1 px-2 rounded-lg border">
+                        <option value="active" ${s.status==='active'?'selected':''}>在读</option>
+                        <option value="completed" ${s.status==='completed'?'selected':''}>已结课</option>
+                        <option value="abandoned" ${s.status==='abandoned'?'selected':''}>已放弃</option>
+                    </select>
+                    <div class="flex gap-2">
+                        <button onclick="editStudentInfo()" class="text-xs text-gray-400 hover:text-blue-500">✏️ 编辑</button>
+                        <button onclick="deleteStudent()" class="text-xs text-gray-300 hover:text-red-500">🗑️ 删除</button>
                     </div>
                 </div>
-                <button onclick="editStudentInfo()" class="text-sm text-gray-400 hover:text-blue-500">✏️ 编辑</button>
             </div>
-            ${s.notes ? `<div class="mt-3 pt-3 border-t border-gray-100 text-sm text-gray-400">备注：${Utils.escapeHtml(s.notes)}</div>` : ''}
         `;
     } catch(e) {
-        document.getElementById('student-info-card').innerHTML = `<div class="text-center py-10 text-red-400">加载失败: ${e.message}</div>`;
+        document.getElementById('student-info-card').innerHTML = `<div class="text-center py-10 text-red-400">加载失败: ${Utils.escapeHtml(e.message)}</div>`;
     }
 }
+
+function changeStudentStatus(status) {
+    API.students.updateStatus(studentId, status).then(r => {
+        if (r.success) { showToast('状态已更新', 'success'); loadStudentDetail(); }
+        else showToast('更新失败：' + (r.error || '未知错误'), 'error');
+    }).catch(e => showToast('更新失败：' + e.message, 'error'));
+}
+
+function editStudentInfo() {
+    API.students.get(studentId).then(r => {
+        if (!r.success) { showToast('加载失败', 'error'); return; }
+        Utils.showModal({
+            title: '编辑学生',
+            subtitle: '修改学生信息',
+            fields: studentFields(),
+            columns: 2,
+            width: 640,
+            values: r.data,
+            onSubmit: async (data) => {
+                try {
+                    const resp = await API.students.update(studentId, data);
+                    if (resp.success) { showToast('已保存', 'success'); loadStudentDetail(); }
+                    else showToast('保存失败：' + (resp.error || '未知错误'), 'error');
+                } catch (e) { showToast('保存失败：' + e.message, 'error'); }
+            },
+        });
+    });
+}
+
+function deleteStudent() {
+    Utils.confirmDialog({
+        title: '删除学生',
+        message: '确定删除该学生？<br>该生的所有学科、报告、成绩、规划等数据将被<b>永久删除</b>，且不可恢复！',
+        danger: true,
+        onOk: async () => {
+            try {
+                const r = await API.students.delete(studentId);
+                if (r.success) { showToast('已删除', 'success'); setTimeout(() => location.hash = '#/students', 600); }
+                else showToast('删除失败：' + (r.error || '未知错误'), 'error');
+            } catch (e) { showToast('删除失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+/* ---------- 学科卡片 ---------- */
+let subjectList = [];   // 缓存当前学科列表，用于新增时查重
 
 async function loadSubjects() {
     try {
         const r = await API.subjects.list(studentId);
         if (!r.success) throw new Error(r.error);
         const subs = r.data;
+        subjectList = subs;
         const container = document.getElementById('subject-cards');
         if (!subs.length) {
             container.innerHTML = '<div class="col-span-5 text-gray-300 text-sm py-4">暂无学科，点击右上角新增</div>';
@@ -77,47 +158,117 @@ async function loadSubjects() {
         container.innerHTML = subs.map(sub => {
             const isActive = sub.status === 'active';
             const icon = Utils.subjectIcon(sub.name);
-            return `<div class="subject-card ${currentSubjectId===sub.id?'active-subject':''}" onclick="selectSubject(${sub.id},'${sub.name}')">
+            const active = currentSubjectId === sub.id ? 'active-subject' : '';
+            return `<div class="subject-card ${active}" onclick="selectSubject(${sub.id})">
                 <div class="flex items-center gap-2 mb-1">
                     <span class="text-lg">${icon}</span>
                     <span class="font-medium text-gray-700">${Utils.escapeHtml(sub.name)}</span>
                 </div>
                 <div class="flex items-center justify-between text-xs">
-                    <span class="${isActive?'text-green-500':'text-gray-400'}">${isActive?'● 活跃':'○ 已停用'}</span>
-                    <button onclick="event.stopPropagation();toggleSubject(${sub.id},'${sub.status}')" class="text-gray-300 hover:text-gray-500 text-xs">${isActive?'停用':'启用'}</button>
+                    <span class="${isActive ? 'text-green-500' : 'text-gray-400'}">${isActive ? '● 活跃' : '○ 已停用'}</span>
+                    <button onclick="event.stopPropagation();toggleSubject(${sub.id},'${sub.status}')" class="text-gray-300 hover:text-gray-500 text-xs">${isActive ? '停用' : '启用'}</button>
                 </div>
             </div>`;
         }).join('');
     } catch(e) {
-        document.getElementById('subject-cards').innerHTML = `<div class="text-red-400 text-sm">${e.message}</div>`;
+        document.getElementById('subject-cards').innerHTML = `<div class="text-red-400 text-sm">${Utils.escapeHtml(e.message)}</div>`;
     }
 }
 
-function selectSubject(id, name) {
-    currentSubjectId = id;
-    document.getElementById('subject-detail-area').classList.remove('hidden');
-    document.getElementById('subject-tab-content').innerHTML = `<p class="text-gray-300 text-center py-10">已选择「${name}」，详细功能将在后续版本中实现</p>`;
-    loadSubjects();
+function selectSubject(id) {
+    // 通过路由切换，页面自动重挂载并按 routeSubjectId 选中
+    location.hash = `#/student/${studentId}/subject/${id}`;
 }
 
-function showAddSubjectModal() {
-    const name = prompt('学科名称（如：数学、英语）：');
-    if (!name) return;
-    API.subjects.create({ student_id: studentId, name }).then(r => {
-        if (r.success) { loadSubjects(); if (confirm('创建成功！是否立即开启 AI 对话？')) location.hash = `#/conversation/${r.data.id}`; }
-        else alert('失败：'+r.error);
+function toggleSubject(id, cur) {
+    const ns = cur === 'active' ? 'paused' : 'active';
+    Utils.confirmDialog({
+        title: ns === 'paused' ? '停用学科' : '启用学科',
+        message: ns === 'paused'
+            ? `确定停用该学科？停用后保留所有历史数据，不再参与活跃管理。`
+            : `确定重新启用该学科？`,
+        onOk: async () => {
+            try {
+                const r = await API.subjects.updateStatus(id, ns);
+                if (r.success) { showToast(ns === 'paused' ? '已停用' : '已启用', 'success'); loadSubjects(); }
+                else showToast('操作失败：' + (r.error || '未知错误'), 'error');
+            } catch (e) { showToast('操作失败：' + e.message, 'error'); }
+        },
     });
 }
 
-async function toggleSubject(id, cur) {
-    const ns = cur === 'active' ? 'paused' : 'active';
-    if (!confirm(`确定${ns==='paused'?'停用':'启用'}该学科？`)) return;
-    try { const r = await API.subjects.updateStatus(id, ns); if (r.success) loadSubjects(); }
-    catch(e) { alert(e.message); }
+function showAddSubjectModal() {
+    Utils.showModal({
+        title: '新增学科',
+        subtitle: '选择要补课的学科',
+        fields: [
+            { key: 'name', label: '学科', type: 'select', options: Utils.subjectPresets.map(s => ({ v: s, label: s })), required: true },
+        ],
+        onSubmit: (data) => {
+            // 查重：已存在同名字科则二次确认，避免误加重复学科
+            const dup = subjectList.find(s => s.name === data.name);
+            if (dup) {
+                Utils.confirmDialog({
+                    title: '学科已存在',
+                    message: `该学生已有「${data.name}」学科（${dup.status === 'active' ? '活跃中' : '已停用'}），是否仍要新增？`,
+                    onOk: () => createSubject(data.name),
+                });
+            } else {
+                createSubject(data.name);
+            }
+        },
+    });
 }
 
-function editStudentInfo() { alert('编辑功能将在后续版本完善'); }
+async function createSubject(name) {
+    try {
+        const r = await API.subjects.create({ student_id: studentId, name });
+        if (r.success) {
+            showToast('学科创建成功', 'success');
+            await loadSubjects();
+            // 选中新学科并展示详情区（P4 起可自动开启 AI 对话）
+            selectSubject(r.data.id);
+        } else showToast('创建失败：' + (r.error || '未知错误'), 'error');
+    } catch (e) { showToast('创建失败：' + e.message, 'error'); }
+}
+
+/* ---------- 学科详情区（Tabs，P4 起填充真实内容） ---------- */
+function renderSubjectDetailPlaceholder() {
+    const sub = { id: currentSubjectId };
+    document.getElementById('subject-tab-content').innerHTML =
+        `<p class="text-gray-300 text-center py-10">学科 #${sub.id} 的报告 / 规划 / 成绩 / 沟通日志功能将在后续版本实现</p>`;
+}
+
+function switchSubjectTab(tab) {
+    document.querySelectorAll('#subject-tabs [data-tab]').forEach(b => {
+        const isActive = b.dataset.tab === tab;
+        b.className = isActive
+            ? 'px-4 py-2.5 text-sm font-medium text-blue-600 bg-white border border-b-0 rounded-t-lg'
+            : 'px-4 py-2.5 text-sm text-gray-400 hover:text-gray-600';
+        if (isActive) { b.style.cssText = 'border-color:#e2e8f0; margin-bottom:-1px;'; }
+        else b.style.cssText = '';
+    });
+    const tabNames = { report: '📄 报告', plan: '📅 课程规划', scores: '📊 成绩', logs: '📝 沟通日志' };
+    document.getElementById('subject-tab-content').innerHTML =
+        `<p class="text-gray-300 text-center py-10">「${tabNames[tab]}」功能将在后续版本实现</p>`;
+}
+
+/* ---------- 初始化 ---------- */
+function refreshStudentDetail() {
+    loadStudentDetail();
+    loadSubjects();
+    if (currentSubjectId) {
+        document.getElementById('subject-detail-area').classList.remove('hidden');
+        renderSubjectDetailPlaceholder();
+    }
+}
+// 注册全局刷新（顶部「↻ 刷新」按钮 / 切回标签页自动调用）
+window.currentPageRefresh = refreshStudentDetail;
 
 loadStudentDetail();
-loadStudents();
+if (routeSubjectId) {
+    document.getElementById('subject-detail-area').classList.remove('hidden');
+    renderSubjectDetailPlaceholder();
+}
+loadSubjects();
 </script>

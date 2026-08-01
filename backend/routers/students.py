@@ -1,14 +1,31 @@
 """
 学生管理 API
 """
-import json
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from backend.models import get_db
 from backend.models.student import Student
-from backend.utils.helpers import success_response, error_response, now_iso
+from backend.models.subject import Subject
+from backend.utils.helpers import success_response, now_iso
 
 router = APIRouter(prefix="/api/students", tags=["students"])
+
+
+def _active_subject_counts(db: Session) -> dict:
+    """返回 {student_id: 活跃学科数} 映射，供列表/详情使用"""
+    rows = db.query(Subject.student_id, func.count(Subject.id)).filter(
+        Subject.status == "active"
+    ).group_by(Subject.student_id).all()
+    return {sid: cnt for sid, cnt in rows}
+
+
+def _to_dict_with_subjects(db: Session, student: Student) -> dict:
+    """学生 to_dict + 活跃/总学科数"""
+    counts = _active_subject_counts(db)
+    data = student.to_dict()
+    data["active_subjects"] = counts.get(student.id, 0)
+    return data
 
 
 @router.get("")
@@ -34,8 +51,14 @@ def list_students(
     items = query.order_by(Student.updated_at.desc()).offset(
         (page - 1) * page_size
     ).limit(page_size).all()
+    counts = _active_subject_counts(db)
+    result_items = []
+    for s in items:
+        data = s.to_dict()
+        data["active_subjects"] = counts.get(s.id, 0)
+        result_items.append(data)
     return success_response({
-        "items": [s.to_dict() for s in items],
+        "items": result_items,
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -69,7 +92,7 @@ def get_student(student_id: int, db: Session = Depends(get_db)):
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="学生不存在")
-    return success_response(student.to_dict())
+    return success_response(_to_dict_with_subjects(db, student))
 
 
 @router.put("/{student_id}")

@@ -189,6 +189,7 @@ tutoring-agent/
 - 学科 `status`：`active` | `paused`
 - JSON 字段：`answers_json`、`content_json`、`plan_json`、`messages_json`
 - 删除学生 → 级联删除学科及所有关联数据 (ON DELETE CASCADE)
+- **必须启用 SQLite 外键**：`backend/models/__init__.py` 里已加 `PRAGMA foreign_keys=ON`，所有表的新增 FK 级联都依赖它，改动 models 时不要移除
 - 停用学科 ≠ 删除，数据全保留
 
 ### AI 配置
@@ -216,7 +217,7 @@ tutoring-agent/
 |------|------|------|
 | P1 项目骨架 | ✅ 已完成 | FastAPI + SQLite建表 + 前端骨架 + 导航 |
 | P2 AI 服务层 | ✅ 已完成 | BaseLLMProvider + Provider×5 + AIManager + 设置页AI配置 |
-| P3 学生档案+学科 | ⬜ 待开发 | 学生CRUD + 学科增删/停用 + 详情页 |
+| P3 学生档案+学科 | ✅ 已完成 | 学生CRUD + 学科增删/停用 + 详情页 |
 | P4 AI对话采集 | ⬜ 待开发 | 对话UI + 消息API + AI追问 + 结束判断 |
 | P5 报告生成导出 | ⬜ 待开发 | Prompt模板 + 报告预览/编辑 + 重新生成 + PDF导出 |
 | P6 成绩+规划 | ⬜ 待开发 | 成绩录入 + ECharts曲线 + AI分析 + 课程规划编辑器 |

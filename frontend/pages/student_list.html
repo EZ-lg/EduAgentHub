@@ -3,12 +3,7 @@
     <div class="flex items-center justify-between mb-4">
         <div class="flex gap-2">
             <input type="text" id="student-search" placeholder="搜索姓名/电话..." class="w-56 text-sm" oninput="filterStudents()">
-            <select id="student-grade-filter" class="text-sm" onchange="filterStudents()">
-                <option value="">全部年级</option>
-                <option>小一</option><option>小二</option><option>小三</option><option>小四</option><option>小五</option><option>小六</option>
-                <option>初一</option><option>初二</option><option>初三</option>
-                <option>高一</option><option>高二</option><option>高三</option>
-            </select>
+            <select id="student-grade-filter" class="text-sm" onchange="filterStudents()"></select>
             <select id="student-status-filter" class="text-sm" onchange="filterStudents()">
                 <option value="">全部状态</option>
                 <option value="active">在读</option>
@@ -16,7 +11,10 @@
                 <option value="abandoned">已放弃</option>
             </select>
         </div>
-        <button onclick="showCreateStudentModal()" class="btn-primary">➕ 新建学生</button>
+        <div class="flex gap-2">
+            <button onclick="loadStudents()" class="btn-outline" title="刷新列表">↻ 刷新</button>
+            <button onclick="showCreateStudentModal()" class="btn-primary">➕ 新建学生</button>
+        </div>
     </div>
 
     <div class="panel overflow-hidden" style="padding:0;">
@@ -27,7 +25,7 @@
                     <th class="text-left px-4 py-3">年级</th>
                     <th class="text-left px-4 py-3">学校</th>
                     <th class="text-left px-4 py-3">电话</th>
-                    <th class="text-left px-4 py-3">学科数</th>
+                    <th class="text-left px-4 py-3">活跃学科</th>
                     <th class="text-left px-4 py-3">状态</th>
                     <th class="text-left px-4 py-3">更新时间</th>
                     <th class="text-right px-4 py-3">操作</th>
@@ -45,6 +43,23 @@
 <script>
 let studentPage = 1, studentTotal = 0;
 
+/* ---------- 学生表单字段（新建/编辑共用，两列填表式） ---------- */
+function studentFields() {
+    return [
+        { key: 'name', label: '姓名', required: true, placeholder: '学生姓名', section: '基本信息' },
+        { key: 'gender', label: '性别', type: 'select', options: [{ v: '', label: '请选择' }, { v: '男', label: '男' }, { v: '女', label: '女' }], section: '基本信息' },
+        { key: 'grade', label: '年级', type: 'select', options: [{ v: '', label: '请选择' }].concat(Utils.grades.map(g => ({ v: g, label: g }))), section: '基本信息' },
+        { key: 'school', label: '学校', placeholder: '就读学校', section: '基本信息' },
+        { key: 'phone', label: '学生电话', placeholder: '联系电话', section: '联系方式' },
+        { key: 'parent_name', label: '家长姓名', section: '联系方式' },
+        { key: 'parent_phone', label: '家长电话', section: '联系方式' },
+        { key: 'address', label: '家庭地址', placeholder: '家庭住址', section: '其他信息', full: true },
+        { key: 'source', label: '来源渠道', placeholder: '转介绍 / 地推 / 线上', section: '其他信息' },
+        { key: 'status', label: '状态', type: 'select', options: [{ v: 'active', label: '在读' }, { v: 'completed', label: '已结课' }, { v: 'abandoned', label: '已放弃' }], section: '其他信息' },
+    ];
+}
+
+/* ---------- 列表加载 ---------- */
 async function loadStudents() {
     const search = document.getElementById('student-search')?.value || '';
     const grade = document.getElementById('student-grade-filter')?.value || '';
@@ -53,7 +68,7 @@ async function loadStudents() {
         const resp = await API.students.list({ search, grade, status, page: studentPage, page_size: 15 });
         if (resp.success) { studentTotal = resp.data.total; renderTable(resp.data.items); renderPagination(); }
     } catch(e) {
-        document.getElementById('student-table-body').innerHTML = `<tr><td colspan="8" class="text-center py-10 text-red-400">加载失败: ${e.message}</td></tr>`;
+        document.getElementById('student-table-body').innerHTML = `<tr><td colspan="8" class="text-center py-10 text-red-400">加载失败: ${Utils.escapeHtml(e.message)}</td></tr>`;
     }
 }
 
@@ -65,17 +80,21 @@ function renderTable(items) {
     }
     tbody.innerHTML = items.map(s => {
         const st = Utils.statusLabel(s.status);
+        const sc = s.active_subjects || 0;
+        const subjectBadge = sc > 0
+            ? `<span class="px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-600">${sc} 科</span>`
+            : '<span class="text-gray-300">0</span>';
         return `<tr class="cursor-pointer" onclick="location.hash='#/student/${s.id}'">
             <td class="px-4 py-3 font-medium text-gray-800">${Utils.escapeHtml(s.name)}</td>
             <td class="px-4 py-3 text-gray-600">${Utils.escapeHtml(s.grade)}</td>
             <td class="px-4 py-3 text-gray-500">${Utils.escapeHtml(s.school)}</td>
             <td class="px-4 py-3 text-gray-500">${Utils.escapeHtml(s.phone)}</td>
-            <td class="px-4 py-3 text-gray-400">-</td>
+            <td class="px-4 py-3">${subjectBadge}</td>
             <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-full text-xs ${st.cls}">${st.text}</span></td>
             <td class="px-4 py-3 text-gray-300 text-xs">${Utils.formatDate(s.updated_at)}</td>
             <td class="px-4 py-3 text-right">
-                <button onclick="event.stopPropagation();editStudent(${s.id})" class="text-blue-500 hover:text-blue-700 mr-2">✏️</button>
-                <button onclick="event.stopPropagation();deleteStudentConfirm(${s.id})" class="text-gray-300 hover:text-red-500">🗑️</button>
+                <button onclick="event.stopPropagation();editStudent(${s.id})" class="text-blue-500 hover:text-blue-700 mr-2" title="编辑">✏️</button>
+                <button onclick="event.stopPropagation();deleteStudentConfirm(${s.id})" class="text-gray-300 hover:text-red-500" title="删除">🗑️</button>
             </td>
         </tr>`;
     }).join('');
@@ -94,28 +113,67 @@ function renderPagination() {
 
 function filterStudents() { studentPage = 1; loadStudents(); }
 
+/* ---------- 新建/编辑/删除 ---------- */
 function showCreateStudentModal() {
-    const name = prompt('学生姓名：'); if (!name) return;
-    const grade = prompt('年级（如：初二）：') || '';
-    const school = prompt('学校：') || '';
-    const phone = prompt('电话：') || '';
-    API.students.create({ name, grade, school, phone }).then(r => {
-        if (r.success) { alert('创建成功！'); loadStudents(); }
-        else alert('失败：'+r.error);
-    }).catch(e => alert('失败：'+e.message));
+    Utils.showModal({
+        title: '新建学生',
+        subtitle: '一次填完基本信息，方便后续跟进',
+        fields: studentFields(),
+        columns: 2,
+        width: 640,
+        onSubmit: async (data) => {
+            try {
+                const r = await API.students.create(data);
+                if (r.success) { showToast('学生创建成功', 'success'); loadStudents(); }
+                else showToast('创建失败：' + (r.error || '未知错误'), 'error');
+            } catch (e) { showToast('创建失败：' + e.message, 'error'); }
+        },
+    });
 }
 
 function editStudent(id) {
-    const name = prompt('姓名：'); if (!name) return;
-    const grade = prompt('年级：') || '';
-    API.students.update(id, { name, grade }).then(r => { if (r.success) loadStudents(); });
+    API.students.get(id).then(r => {
+        if (!r.success) { showToast('加载学生失败：' + (r.error || '未知错误'), 'error'); return; }
+        Utils.showModal({
+            title: '编辑学生',
+            subtitle: '修改学生信息',
+            fields: studentFields(),
+            columns: 2,
+            width: 640,
+            values: r.data,
+            onSubmit: async (data) => {
+                try {
+                    const resp = await API.students.update(id, data);
+                    if (resp.success) { showToast('已保存', 'success'); loadStudents(); }
+                    else showToast('保存失败：' + (resp.error || '未知错误'), 'error');
+                } catch (e) { showToast('保存失败：' + e.message, 'error'); }
+            },
+        });
+    });
 }
 
 function deleteStudentConfirm(id) {
-    if (confirm('确定删除？所有学科及关联数据将被永久删除。')) {
-        API.students.delete(id).then(r => { if (r.success) loadStudents(); });
-    }
+    Utils.confirmDialog({
+        title: '删除学生',
+        message: '确定删除该学生？<br>该生的所有学科、报告、成绩、规划等数据将被<b>永久删除</b>，且不可恢复！',
+        danger: true,
+        onOk: async () => {
+            try {
+                const r = await API.students.delete(id);
+                if (r.success) { showToast('已删除', 'success'); loadStudents(); }
+                else showToast('删除失败：' + (r.error || '未知错误'), 'error');
+            } catch (e) { showToast('删除失败：' + e.message, 'error'); }
+        },
+    });
 }
+
+/* ---------- 初始化：年级筛选下拉 ---------- */
+document.getElementById('student-grade-filter').innerHTML =
+    '<option value="">全部年级</option>' +
+    Utils.grades.map(g => `<option>${g}</option>`).join('');
+
+// 注册全局刷新（顶部「↻ 刷新」按钮 / 切回标签页自动调用）
+window.currentPageRefresh = loadStudents;
 
 loadStudents();
 </script>

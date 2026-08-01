@@ -64,7 +64,7 @@
 </div>
 
 <script>
-(async function() {
+async function loadDashboard() {
     try {
         const r = await API.dashboard.stats();
         if (r.success) {
@@ -87,5 +87,10 @@
             ).join('');
         }
     } catch(e) { console.error(e); }
-})();
+}
+
+// 注册全局刷新（顶部「↻ 刷新」按钮 / 切回标签页自动调用）
+window.currentPageRefresh = loadDashboard;
+
+loadDashboard();
 </script>
