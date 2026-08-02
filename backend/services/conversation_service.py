@@ -26,6 +26,8 @@ from backend.utils.helpers import now_iso
 # 对话追问用较低温度保证提问稳定；总结用更低温度保证事实性
 DIALOGUE_TEMPERATURE = 0.4
 SUMMARY_TEMPERATURE = 0.3
+# 学情总结追加为 AI 消息时的固定前缀（展示用），返回给前端时统一剥掉保持 summary 字段一致
+SUMMARY_PREFIX = "【学情总结】\n"
 
 
 # ---------------------------------------------------------------- 私有工具
@@ -192,18 +194,22 @@ def start_conversation(db: Session, subject_id: int) -> dict:
 
     configured = ai_manager.is_configured("llm")
     msgs = _load_messages(conv)
+    first_question_failed = False
     # 空会话 + 已配置 → 补首个问题（覆盖"先未配置后配置"的恢复路径）
     if configured and not msgs:
         try:
             reply, _ = _run_turn(db, conv, subject, student, msgs)
             if reply:
                 msgs = _append(db, conv, "ai", reply)
+            else:
+                first_question_failed = True
         except Exception:
-            pass  # 首问失败留空，前端重调 start 即可重试
+            first_question_failed = True  # 首问失败留空，前端可提示重试（重调 start 幂等安全）
 
     return {
         "conversation": conversation_to_dict(conv, msgs),
         "configured": configured,
+        "first_question_failed": first_question_failed,
         "subject_name": subject.name,
         "student_name": student.name,
     }
@@ -280,7 +286,9 @@ def end_conversation(db: Session, subject_id: int, conversation_id: int) -> dict
         summary = ""
         for m in reversed(msgs):
             if m.get("role") == "ai":
-                summary = m.get("content", "")
+                raw = m.get("content", "")
+                # 剥掉存储时的展示前缀，保证 summary 与首次 end 返回的纯文本一致
+                summary = raw[len(SUMMARY_PREFIX):] if raw.startswith(SUMMARY_PREFIX) else raw
                 break
         return {
             "conversation_id": conv.id,
@@ -308,7 +316,7 @@ def end_conversation(db: Session, subject_id: int, conversation_id: int) -> dict
     if not summary:
         summary = "对话已结束。学情总结生成失败，可稍后重新对话采集。"
 
-    msgs = _append(db, conv, "ai", "【学情总结】\n" + summary)
+    msgs = _append(db, conv, "ai", SUMMARY_PREFIX + summary)
     conv.status = "completed"
     conv.updated_at = now_iso()
     db.commit()

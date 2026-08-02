@@ -41,6 +41,7 @@
 </div>
 
 <script>
+(function () {
 let studentPage = 1, studentTotal = 0;
 
 /* ---------- 学生表单字段（新建/编辑共用，两列填表式） ---------- */
@@ -105,13 +106,20 @@ function renderPagination() {
     document.getElementById('student-pagination').innerHTML = totalPages > 1
         ? `<span>共 ${studentTotal} 条 · ${studentPage}/${totalPages}</span>
            <div class="flex gap-1">
-               <button onclick="studentPage=Math.max(1,studentPage-1);loadStudents()" class="px-2 py-1 border rounded text-xs hover:border-gray-400" ${studentPage<=1?'disabled':''}>‹ 上一页</button>
-               <button onclick="studentPage=Math.min(${totalPages},studentPage+1);loadStudents()" class="px-2 py-1 border rounded text-xs hover:border-gray-400" ${studentPage>=totalPages?'disabled':''}>下一页 ›</button>
+               <button onclick="changePage(-1)" class="px-2 py-1 border rounded text-xs hover:border-gray-400" ${studentPage<=1?'disabled':''}>‹ 上一页</button>
+               <button onclick="changePage(1)" class="px-2 py-1 border rounded text-xs hover:border-gray-400" ${studentPage>=totalPages?'disabled':''}>下一页 ›</button>
            </div>`
         : `<span>共 ${studentTotal} 条</span>`;
 }
 
 function filterStudents() { studentPage = 1; loadStudents(); }
+
+// 分页（供内联 onclick 调用；IIFE 内 studentPage 作用域隔离，不能直接内联读写）
+function changePage(delta) {
+    const totalPages = Math.max(1, Math.ceil(studentTotal / 15));
+    studentPage = Math.min(totalPages, Math.max(1, studentPage + delta));
+    loadStudents();
+}
 
 /* ---------- 新建/编辑/删除 ---------- */
 function showCreateStudentModal() {
@@ -176,4 +184,11 @@ document.getElementById('student-grade-filter').innerHTML =
 window.currentPageRefresh = loadStudents;
 
 loadStudents();
+
+/* ---------- IIFE 作用域导出：供内联 onclick 调用 ---------- */
+Object.assign(window, {
+    loadStudents, showCreateStudentModal, editStudent, deleteStudentConfirm,
+    filterStudents, changePage,
+});
+})();
 </script>

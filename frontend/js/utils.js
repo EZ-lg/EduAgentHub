@@ -90,7 +90,7 @@ window.Utils = {
      *   onSubmit(result): 点确定后回调，result 为 {key: value}
      */
     showModal(opts) {
-        const { title = '', subtitle = '', fields = [], values = {}, onSubmit, width = 520, columns = 1 } = opts;
+        const { title = '', subtitle = '', fields = [], values = {}, onSubmit, width = 520, columns = 1, bodyHtml = null, hideOk = false } = opts;
         document.querySelector('.ta-modal-mask')?.remove();
 
         const mask = document.createElement('div');
@@ -139,9 +139,10 @@ window.Utils = {
                 + `<div class="mb-3${span}"><label class="settings-label">${Utils.escapeHtml(f.label)}${req}</label>${input}</div>`;
         });
 
-        const body = columns === 2
-            ? `<div class="grid grid-cols-2 gap-x-4">${fieldHtml}</div>`
-            : fieldHtml;
+        // bodyHtml 优先（只读展示，如版本列表/预览），否则渲染 fields
+        const body = bodyHtml !== null
+            ? bodyHtml
+            : (columns === 2 ? `<div class="grid grid-cols-2 gap-x-4">${fieldHtml}</div>` : fieldHtml);
 
         panel.innerHTML = `
             <div class="flex items-center justify-between px-5 py-3 border-b" style="border-color:#f1f5f9;">
@@ -154,7 +155,7 @@ window.Utils = {
             <div class="px-5 py-4 max-h-[65vh] overflow-y-auto">${body}</div>
             <div class="flex justify-end gap-2 px-5 py-3 border-t" style="border-color:#f1f5f9;">
                 <button class="btn-outline" data-close style="padding:7px 18px;">取消</button>
-                <button class="btn-primary" data-ok style="padding:7px 18px;">确定</button>
+                ${hideOk ? '' : '<button class="btn-primary" data-ok style="padding:7px 18px;">确定</button>'}
             </div>
         `;
         mask.appendChild(panel);
@@ -164,7 +165,8 @@ window.Utils = {
         mask.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', close));
         mask.addEventListener('mousedown', (e) => { if (e.target === mask) close(); });
 
-        mask.querySelector('[data-ok]').addEventListener('click', () => {
+        const okBtn = mask.querySelector('[data-ok]');
+        if (okBtn) okBtn.addEventListener('click', () => {
             const result = {};
             for (const f of fields) {
                 const el = mask.querySelector(`[data-key="${f.key}"]`);

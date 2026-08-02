@@ -1,9 +1,624 @@
-<!-- 报告预览与编辑页 -->
+<!-- 学习计划预览/编辑/导出页（章式排版 + Word 导出） -->
 <div class="fade-in">
-    <div class="text-center py-12 text-gray-400">
-        <div class="text-4xl mb-4">📄</div>
-        <p class="text-lg mb-2">学情报告</p>
-        <p class="text-sm">此功能将在 P5 阶段实现</p>
-        <p class="text-xs text-gray-300 mt-4">报告分节展示 + 编辑 + 重新生成 + PDF 导出</p>
+    <!-- 操作区（打印时隐藏） -->
+    <div id="report-action-bar" class="hidden mb-4 no-print flex items-center justify-between gap-3 flex-wrap">
+        <div class="flex items-center gap-3 min-w-0">
+            <button onclick="goBack()" class="btn-outline" style="padding:7px 14px;font-size:13px;">← 返回</button>
+            <h2 id="report-head-title" class="font-semibold text-gray-800 text-sm truncate">学习计划</h2>
+            <span id="report-status-badge"></span>
+            <span id="report-source-badge" class="text-xs text-gray-400"></span>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="loadReport()" class="btn-outline" style="padding:7px 12px;font-size:13px;">↻ 刷新</button>
+            <button onclick="editTitle()" class="btn-outline" style="padding:7px 12px;font-size:13px;">✏️ 标题</button>
+            <button onclick="regenerateAll()" class="btn-outline" style="padding:7px 12px;font-size:13px;">🔄 重新生成</button>
+            <button onclick="showPlanVersions()" class="btn-outline" style="padding:7px 12px;font-size:13px;">📜 规划版本</button>
+            <button onclick="exportDocx()" class="btn-primary" style="padding:7px 12px;font-size:13px;">📄 导出 Word</button>
+            <button onclick="window.print()" class="btn-outline" style="padding:7px 12px;font-size:13px;">🖨️ 打印</button>
+            <button id="publish-btn" onclick="togglePublish()" class="btn-outline" style="padding:7px 12px;font-size:13px;">发布</button>
+        </div>
+    </div>
+
+    <!-- 加载中 -->
+    <div id="report-loading" class="text-center py-16 text-gray-400">加载中...</div>
+
+    <!-- 文档区 -->
+    <div id="report-export-area" class="hidden panel" style="padding:0;overflow:hidden;">
+        <!-- 机构抬头 -->
+        <div id="pdf-letterhead" class="text-center px-6 pt-6 pb-4" style="border-bottom:3px solid #2563eb;">
+            <div class="deco-line"></div>
+            <div id="pdf-org" class="text-xl font-bold" style="color:#2563eb;">XX教育机构</div>
+            <div id="pdf-title" class="text-base mt-1 font-semibold text-gray-700">学情报告</div>
+            <div id="pdf-meta" class="text-xs text-gray-400 mt-1"></div>
+        </div>
+
+        <!-- 计划正文 -->
+        <div id="report-sections" class="px-6 py-5"></div>
+
+        <!-- 知识库引用 -->
+        <div id="kb-references" class="hidden px-6 pb-5"></div>
     </div>
 </div>
+
+<style>
+    @media print {
+        .no-print { display: none !important; }
+        body { background: #fff !important; }
+        #report-export-area { box-shadow: none !important; border: none !important; }
+    }
+</style>
+
+<script>
+(function () {
+const reportId = parseInt(location.hash.split('/')[2]);
+const PLAN_CHAPTER_PREFIX = '六、';  // 课程规划表格所在章
+const state = {
+    report: null,
+    content: { chapters: [] },
+    subjectId: null,
+    studentId: null,
+    subjectName: '',
+    studentName: '',
+    teachers: [],
+    orgName: store.orgName,
+    busy: false,
+};
+
+/* ---------- 工具 ---------- */
+function esc(s) { return Utils.escapeHtml(String(s ?? '')); }
+
+function renderParagraphs(text) {
+    if (!text) return '<p class="text-gray-400 text-sm italic">（未填写）</p>';
+    return String(text).split('\n').map(p => `<p class="text-gray-700 text-sm leading-relaxed" style="white-space:pre-wrap;">${esc(p)}</p>`).join('');
+}
+
+function nowIso() { return new Date().toISOString(); }
+
+/* ---------- 主加载 ---------- */
+async function loadReport() {
+    const loading = document.getElementById('report-loading');
+    try {
+        const res = await API.reports.get(reportId);
+        if (!res.success) throw new Error(res.error);
+        state.report = res.data;
+        state.content = safeParse(state.report.content_json, { chapters: [] });
+        if (!state.content.chapters || !Array.isArray(state.content.chapters)) state.content.chapters = [];
+        if (!Array.isArray(state.content.plan)) state.content.plan = [];
+
+        try {
+            const sub = await API.subjects.get(state.report.subject_id);
+            if (sub.success) {
+                state.subjectId = sub.data.id;
+                state.subjectName = sub.data.name;
+                state.studentId = sub.data.student_id;
+                const stu = await API.students.get(state.studentId);
+                if (stu.success) state.studentName = stu.data.name;
+            }
+        } catch (e) { /* 学科信息加载失败不阻塞 */ }
+
+        try {
+            const tr = await API.teachers.list();
+            state.teachers = (tr.success && tr.data) ? tr.data : [];
+        } catch (e) { state.teachers = []; }
+
+        try {
+            const pr = await API.reports.pdf(reportId);
+            if (pr.success && pr.data.org_name) state.orgName = pr.data.org_name;
+        } catch (e) { /* 兜底 */ }
+
+        loading.classList.add('hidden');
+        document.getElementById('report-action-bar').classList.remove('hidden');
+        document.getElementById('report-export-area').classList.remove('hidden');
+        renderReport();
+    } catch (e) {
+        loading.innerHTML = `<p class="text-red-400">计划加载失败：${esc(e.message)}</p>`;
+    }
+}
+
+function safeParse(str, fallback) {
+    try { return JSON.parse(str || 'null') || fallback; } catch (e) { return fallback; }
+}
+
+/* ---------- 渲染 ---------- */
+function renderReport() {
+    if (!state.report) return;
+    const r = state.report;
+    const status = Utils.statusLabel(r.status);
+    document.getElementById('report-head-title').textContent = r.title || '学习计划';
+    document.getElementById('report-status-badge').innerHTML =
+        `<span class="px-2 py-0.5 rounded-full text-xs ${status.cls}">${status.text}</span>`;
+    document.getElementById('report-source-badge').textContent = 'AI 生成';
+    document.getElementById('publish-btn').textContent = r.status === 'published' ? '取消发布' : '发布';
+
+    document.getElementById('pdf-org').textContent = state.orgName;
+    document.getElementById('pdf-title').textContent = r.title || '学习计划';
+    const dateStr = Utils.formatDate(r.updated_at, true);
+    document.getElementById('pdf-meta').innerHTML =
+        `<span>学生：${esc(state.studentName || '-')}</span><span>学科：${esc(state.subjectName || '-')}</span><span>更新：${esc(dateStr)}</span>`;
+
+    // 旧版报告兼容
+    if (!Array.isArray(state.content.chapters)) {
+        document.getElementById('report-sections').innerHTML =
+            '<div class="text-center py-16 text-amber-600">这是旧版报告，请点击「🔄 重新生成」升级为最新版式</div>';
+        renderKbReferences(r.kb_references_json);
+        return;
+    }
+
+    // 快照课程规划表格输入值（重渲染后恢复，避免未保存编辑丢失）
+    const snap = snapshotPlanInputs();
+    document.getElementById('report-sections').innerHTML = buildSectionsHtml();
+    restorePlanInputs(snap);
+    renderKbReferences(r.kb_references_json);
+}
+
+function buildSectionsHtml() {
+    const c = state.content;
+    const parts = [];
+    // 副标题
+    if (c.subtitle) parts.push(`<div class="report-subtitle">${esc(c.subtitle)}</div>`);
+    // 方法总纲（红色 callout）
+    if (c.summary) parts.push(`<div class="report-callout">
+            <div class="flex items-center justify-between mb-1">
+                <span>📌 方法总纲</span>
+                <div class="flex gap-1 edit-btn">
+                    <button onclick="editSummary()" class="btn-outline" style="padding:3px 9px;font-size:11px;">✏️ 编辑</button>
+                    <button onclick="regenerateSummary()" class="btn-outline" style="padding:3px 9px;font-size:11px;">🔄 重生成</button>
+                </div>
+            </div>
+            <div style="white-space:pre-wrap;">${esc(c.summary)}</div>
+        </div>`);
+    // 章节
+    c.chapters.forEach((ch, i) => {
+        if (!ch || typeof ch !== 'object') return;
+        const title = ch.title || '';
+        if (title.slice(0, 2) === PLAN_CHAPTER_PREFIX) {
+            parts.push(renderPlanChapterHtml(i, ch));
+        } else {
+            parts.push(renderChapterHtml(i, ch));
+        }
+    });
+    // 写在最后（红色 callout）
+    if (c.conclusion) parts.push(`<div class="report-callout">
+            <div class="flex items-center justify-between mb-1">
+                <span>📝 写在最后</span>
+                <div class="flex gap-1 edit-btn">
+                    <button onclick="editConclusion()" class="btn-outline" style="padding:3px 9px;font-size:11px;">✏️ 编辑</button>
+                    <button onclick="regenerateConclusion()" class="btn-outline" style="padding:3px 9px;font-size:11px;">🔄 重生成</button>
+                </div>
+            </div>
+            <div style="white-space:pre-wrap;">${esc(c.conclusion)}</div>
+        </div>`);
+    return parts.join('');
+}
+
+function chapterBadge(ch) {
+    const aiBadge = ch.ai_generated === false
+        ? '<span class="text-xs text-amber-600">人工修改</span>'
+        : '<span class="text-xs text-blue-500">AI 生成</span>';
+    const modified = ch.last_modified ? ` · 修改于 ${Utils.formatDate(ch.last_modified, true)}` : '';
+    return aiBadge + '<span class="text-xs text-gray-300">' + modified + '</span>';
+}
+
+function renderChapterHtml(i, ch) {
+    return `
+        <div class="report-section">
+            <div class="report-section-title">
+                <div class="title-left">
+                    <span class="font-semibold text-gray-800 text-sm">${esc(ch.title)}</span>
+                    ${chapterBadge(ch)}
+                </div>
+                <div class="flex gap-1 edit-btn">
+                    <button onclick="editSection(${i})" class="btn-outline" style="padding:4px 10px;font-size:12px;">✏️ 编辑</button>
+                    <button onclick="regenerateSection(${i})" class="btn-outline" style="padding:4px 10px;font-size:12px;">🔄 重生成</button>
+                </div>
+            </div>
+            ${renderParagraphs(ch.content)}
+        </div>`;
+}
+
+function renderPlanChapterHtml(i, ch) {
+    const plan = Array.isArray(state.content.plan) ? state.content.plan : [];
+    const firstTid = plan.length ? plan[0].teacher_id : null;
+    const commonTeacherId = plan.length && plan.every(r => r.teacher_id === firstTid) ? firstTid : '';
+    return `
+        <div class="report-section">
+            <div class="report-section-title">
+                <div class="title-left">
+                    <span class="font-semibold text-gray-800 text-sm">${esc(ch.title)}</span>
+                    ${chapterBadge(ch)}
+                </div>
+                <div class="flex gap-1 edit-btn">
+                    <button onclick="editSection(${i})" class="btn-outline" style="padding:4px 10px;font-size:12px;">✏️ 编辑</button>
+                    <button onclick="regenerateSection(${i})" class="btn-outline" style="padding:4px 10px;font-size:12px;">🔄 重生成</button>
+                    <button onclick="regeneratePlan()" class="btn-outline" style="padding:4px 10px;font-size:12px;">🔄 重生成规划</button>
+                </div>
+            </div>
+            ${renderParagraphs(ch.content)}
+            <div class="flex items-center gap-2 mt-2 mb-1">
+                <span class="text-xs text-gray-500 font-medium">👨‍🏫 统一指派教师：</span>
+                <select id="plan-teacher-all" onchange="assignTeacherAll(this.value)" class="text-sm" style="width:200px;padding:4px 10px;">
+                    <option value="">— 不指定（教务后续安排）—</option>
+                    ${(state.teachers || []).map(t =>
+                        `<option value="${t.id}" ${t.id == commonTeacherId ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}
+                </select>
+                <span class="text-xs text-gray-300">选一个老师后，全部课程由该老师授课</span>
+            </div>
+            <div class="mt-1 overflow-x-auto">
+                <table class="w-full text-sm" style="min-width:720px;">
+                    <thead>
+                        <tr><th style="width:90px;">课时</th><th>课程内容</th><th style="width:70px;">课时数</th><th style="width:120px;">教师</th><th style="width:160px;">时间安排</th><th style="width:130px;">备注</th><th style="width:40px;"></th></tr>
+                    </thead>
+                    <tbody id="plan-tbody">
+                        ${plan.map((row, j) => planRowHtml(row, j)).join('') || '<tr><td colspan="7" class="text-center text-gray-400 py-4">暂无课程规划，点击下方「➕ 新增行」添加</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+            <div class="flex gap-2 mt-3">
+                <button onclick="addPlanRow()" class="btn-outline" style="padding:5px 14px;font-size:12px;">➕ 新增行</button>
+                <button onclick="savePlan()" class="btn-primary" style="padding:5px 14px;font-size:12px;">💾 保存规划</button>
+            </div>
+        </div>`;
+}
+
+function planRowHtml(row, i) {
+    const teacherOpts = ['<option value="">未指派</option>']
+        .concat((state.teachers || []).map(t =>
+            `<option value="${t.id}" ${t.id == row.teacher_id ? 'selected' : ''}>${esc(t.name)}</option>`))
+        .join('');
+    return `
+        <tr>
+            <td><input data-plan="lesson" data-i="${i}" value="${esc(row.lesson)}" class="w-full" style="min-width:70px;" placeholder="第1课"></td>
+            <td><input data-plan="content" data-i="${i}" value="${esc(row.content)}" class="w-full" placeholder="课程内容"></td>
+            <td><input data-plan="hours" data-i="${i}" type="number" min="0" value="${row.hours ?? ''}" class="w-full" style="min-width:50px;"></td>
+            <td><select data-plan="teacher_id" data-i="${i}" class="w-full">${teacherOpts}</select></td>
+            <td><input data-plan="schedule" data-i="${i}" value="${esc(row.schedule)}" class="w-full" style="min-width:120px;" placeholder="每周一 18:00"></td>
+            <td><input data-plan="notes" data-i="${i}" value="${esc(row.notes)}" class="w-full" style="min-width:100px;"></td>
+            <td><button onclick="deletePlanRow(${i})" class="btn-outline" style="padding:3px 8px;font-size:12px;color:#dc2626;">🗑️</button></td>
+        </tr>`;
+}
+
+/* ---------- 课程规划表格输入快照/恢复 ---------- */
+function snapshotPlanInputs() {
+    const snap = {};
+    document.querySelectorAll('[data-plan]').forEach(el => {
+        snap[el.dataset.plan + '_' + el.dataset.i] = el.value;
+    });
+    return snap;
+}
+function restorePlanInputs(snap) {
+    document.querySelectorAll('[data-plan]').forEach(el => {
+        const v = snap[el.dataset.plan + '_' + el.dataset.i];
+        if (v !== undefined) el.value = v;
+    });
+}
+
+/* ---------- 统一指派教师 / 增删行 / 保存 ---------- */
+function assignTeacherAll(tid) {
+    const plan = state.content.plan = Array.isArray(state.content.plan) ? state.content.plan : [];
+    const teacher = state.teachers.find(t => t.id == tid);
+    const newTid = tid ? parseInt(tid) : null;
+    plan.forEach(row => {
+        row.teacher_id = newTid;
+        row.teacher_name = teacher ? teacher.name : '';
+    });
+    renderReport();
+    showToast(newTid ? `已统一指派教师：${teacher ? teacher.name : ''}（记得点「💾 保存规划」）` : '已清除教师指派', 'success');
+}
+
+function addPlanRow() {
+    const plan = state.content.plan = Array.isArray(state.content.plan) ? state.content.plan : [];
+    const maxLesson = plan.reduce((m, r) => {
+        const n = parseInt(r.lesson);
+        return !isNaN(n) && n > m ? n : m;
+    }, 0);
+    plan.push({ lesson: `第${maxLesson + 1}课`, content: '', hours: null, teacher_id: null, teacher_name: '', schedule: '', notes: '' });
+    renderReport();
+}
+
+function deletePlanRow(i) {
+    const plan = state.content.plan = Array.isArray(state.content.plan) ? state.content.plan : [];
+    if (!plan.length) return;
+    plan.splice(i, 1);
+    renderReport();
+}
+
+function collectPlanRows() {
+    const inputs = document.querySelectorAll('[data-plan]');
+    if (!inputs.length) return [];
+    let maxI = -1;
+    inputs.forEach(el => { const n = parseInt(el.dataset.i); if (n > maxI) maxI = n; });
+    const rows = [];
+    for (let i = 0; i <= maxI; i++) {
+        const q = k => document.querySelector(`[data-plan="${k}"][data-i="${i}"]`);
+        const lesson = q('lesson')?.value?.trim() || '';
+        const content = q('content')?.value?.trim() || '';
+        if (!lesson && !content) continue; // 跳过空行
+        const tidRaw = q('teacher_id')?.value;
+        const tid = tidRaw && tidRaw !== '' ? parseInt(tidRaw) : null;
+        const teacherName = tid && state.teachers.length
+            ? (state.teachers.find(t => t.id === tid)?.name || '') : '';
+        rows.push({
+            lesson,
+            content,
+            hours: q('hours')?.value !== '' ? Number(q('hours')?.value) : null,
+            teacher_id: tid,
+            teacher_name: teacherName,
+            schedule: q('schedule')?.value?.trim() || '',
+            notes: q('notes')?.value?.trim() || '',
+        });
+    }
+    return rows;
+}
+
+async function savePlan() {
+    if (state.busy) return;
+    const rows = collectPlanRows();
+    state.content.plan = rows;
+    // 找到「六、」章，标记人工修改
+    const ch = state.content.chapters.find(c => c && String(c.title || '').slice(0, 2) === PLAN_CHAPTER_PREFIX);
+    if (ch) { ch.ai_generated = false; ch.last_modified = nowIso(); }
+    await persistReport(null, rows);
+}
+
+/* ---------- 编辑/重生成 ---------- */
+function editSection(i) {
+    const ch = state.content.chapters[i] || {};
+    Utils.showModal({
+        title: `编辑「${ch.title || ''}」`,
+        subtitle: '保存后该章标记为人工修改',
+        fields: [{ key: 'content', label: '内容', type: 'textarea', rows: 8, required: true }],
+        values: { content: ch.content || '' },
+        onSubmit: async (r) => {
+            const target = state.content.chapters[i] = state.content.chapters[i] || {};
+            target.content = r.content;
+            target.ai_generated = false;
+            target.last_modified = nowIso();
+            await persistReport();
+        },
+    });
+}
+
+function editSummary() {
+    Utils.showModal({
+        title: '编辑「方法总纲」',
+        fields: [{ key: 'content', label: '内容', type: 'textarea', rows: 4, required: true }],
+        values: { content: state.content.summary || '' },
+        onSubmit: async (r) => {
+            state.content.summary = r.content;
+            await persistReport();
+        },
+    });
+}
+
+function editConclusion() {
+    Utils.showModal({
+        title: '编辑「写在最后」',
+        fields: [{ key: 'content', label: '内容', type: 'textarea', rows: 4, required: true }],
+        values: { content: state.content.conclusion || '' },
+        onSubmit: async (r) => {
+            state.content.conclusion = r.content;
+            await persistReport();
+        },
+    });
+}
+
+function editTitle() {
+    Utils.showModal({
+        title: '编辑计划标题',
+        fields: [{ key: 'title', label: '标题', type: 'text', required: true }],
+        values: { title: state.report.title || '' },
+        onSubmit: async (r) => {
+            const res = await API.reports.update(reportId, { title: r.title });
+            if (!res.success) throw new Error(res.error);
+            state.report = res.data;
+            renderReport();
+            showToast('标题已更新', 'success');
+        },
+    });
+}
+
+function doRegenerate(sectionKey, label) {
+    if (state.busy) return;
+    Utils.showModal({
+        title: `重新生成「${label}」`,
+        subtitle: '可补充说明，AI 将结合补充信息重写',
+        fields: [{ key: 'extra_info', label: '补充信息（选填）', type: 'textarea', rows: 4, required: false }],
+        onSubmit: async (r) => {
+            state.busy = true;
+            showToast('正在重新生成，请稍候...', 'info');
+            try {
+                const payload = { extra_info: r.extra_info || '' };
+                if (sectionKey) payload.section = sectionKey;
+                const res = await API.reports.regenerate(reportId, payload);
+                if (!res.success) throw new Error(res.error);
+                state.report = res.data;
+                state.content = safeParse(res.data.content_json, { chapters: [] });
+                renderReport();
+                showToast(`「${label}」已重新生成`, 'success');
+            } catch (e) {
+                showToast('重新生成失败：' + e.message, 'error');
+            } finally {
+                state.busy = false;
+            }
+        },
+    });
+}
+
+function regenerateSection(i) {
+    const ch = state.content.chapters[i] || {};
+    doRegenerate(ch.title, ch.title || '该章');
+}
+function regenerateSummary() { doRegenerate('summary', '方法总纲'); }
+function regenerateConclusion() { doRegenerate('conclusion', '写在最后'); }
+function regeneratePlan() { doRegenerate('plan', '课程规划'); }
+
+function regenerateAll() {
+    doRegenerate('', '整份计划');
+}
+
+async function persistReport(extraPayload, planRows) {
+    if (state.busy) return;
+    state.busy = true;
+    try {
+        const payload = { content_json: JSON.stringify(state.content) };
+        if (extraPayload) Object.assign(payload, extraPayload);
+        const res = await API.reports.update(reportId, payload);
+        if (!res.success) throw new Error(res.error);
+        state.report = res.data;
+        if (state.report.course_plan_id && planRows) {
+            await API.plans.update(state.report.course_plan_id, { plan_json: JSON.stringify(planRows) });
+        }
+        renderReport();
+        showToast('已保存', 'success');
+    } catch (e) {
+        showToast('保存失败：' + e.message, 'error');
+    } finally {
+        state.busy = false;
+    }
+}
+
+async function togglePublish() {
+    if (state.busy) return;
+    const next = state.report.status === 'published' ? 'draft' : 'published';
+    try {
+        const res = await API.reports.update(reportId, { status: next });
+        if (!res.success) throw new Error(res.error);
+        state.report = res.data;
+        renderReport();
+        showToast(next === 'published' ? '计划已发布' : '已取消发布', 'success');
+    } catch (e) {
+        showToast('操作失败：' + e.message, 'error');
+    }
+}
+
+/* ---------- 规划版本 ---------- */
+async function showPlanVersions() {
+    if (!state.report.course_plan_id) {
+        showToast('该计划暂无关联课程规划', 'info');
+        return;
+    }
+    try {
+        const res = await API.plans.versions(state.report.course_plan_id);
+        if (!res.success) throw new Error(res.error);
+        const versions = res.data || [];
+        const html = versions.map(v => `
+            <div class="flex items-center justify-between py-2 border-b" style="border-color:#f1f5f9;">
+                <div>
+                    <span class="font-medium text-gray-700">v${v.version}</span>
+                    <span class="ml-2 text-xs text-gray-400">${Utils.formatDate(v.created_at, true)}</span>
+                    ${v.status === 'active'
+                        ? '<span class="ml-2 text-xs text-green-600 bg-green-50 px-1.5 py-0.5 rounded">当前</span>'
+                        : '<span class="ml-2 text-xs text-gray-400">已归档</span>'}
+                </div>
+                <button onclick="previewPlanVersion(${v.id}, ${v.version})" class="btn-outline" style="padding:4px 10px;font-size:12px;">预览</button>
+            </div>`).join('');
+        Utils.showModal({
+            title: '课程规划版本历史',
+            subtitle: `${versions.length} 个版本`,
+            width: 560,
+            hideOk: true,
+            bodyHtml: html || '<p class="text-gray-400 text-center py-6">暂无版本</p>',
+        });
+    } catch (e) {
+        showToast('加载版本失败：' + e.message, 'error');
+    }
+}
+
+async function previewPlanVersion(planId) {
+    try {
+        const res = await API.plans.list(state.subjectId);
+        if (!res.success) throw new Error(res.error);
+        const plan = (res.data || []).find(p => p.id === planId);
+        if (!plan) { showToast('规划不存在', 'error'); return; }
+        const rows = safeParse(plan.plan_json, []);
+        const html = `<div class="text-sm">` + (Array.isArray(rows) ? rows.map(r =>
+            `<div class="py-2 border-b" style="border-color:#f1f5f9;">
+                <span class="font-medium">${esc(r.lesson)}</span>
+                <span class="ml-2 text-gray-600">${esc(r.content)}</span>
+                <span class="ml-2 text-xs text-gray-400">${r.hours ?? ''}课时</span>
+                <span class="ml-2 text-xs text-gray-400">${esc(r.teacher_name || '')}</span>
+                <span class="ml-2 text-xs text-gray-400">${esc(r.schedule || '')}</span>
+            </div>`).join('') : '') + `</div>`;
+        Utils.showModal({
+            title: `规划 v${plan.version} 预览`,
+            width: 600,
+            hideOk: true,
+            bodyHtml: html,
+        });
+    } catch (e) {
+        showToast('预览失败：' + e.message, 'error');
+    }
+}
+
+/* ---------- 知识库引用 ---------- */
+function renderKbReferences(kbJson) {
+    const wrap = document.getElementById('kb-references');
+    const refs = safeParse(kbJson, []);
+    if (!Array.isArray(refs) || !refs.length) {
+        wrap.classList.add('hidden');
+        return;
+    }
+    wrap.classList.remove('hidden');
+    wrap.innerHTML = `
+        <div class="pt-4 border-t" style="border-color:#f1f5f9;">
+            <div class="text-xs font-semibold text-gray-400 mb-2">📚 知识库引用</div>
+            ${refs.map(r => `
+                <div class="flex items-center gap-2 text-xs text-gray-500 py-1">
+                    <span class="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">${esc(r.category || '资料')}</span>
+                    <span>${esc(r.title || '')}</span>
+                    ${r.snippet ? `<span class="text-gray-400 truncate">${esc(r.snippet)}</span>` : ''}
+                </div>`).join('')}
+        </div>`;
+}
+
+/* ---------- 导出 Word / 打印 ---------- */
+async function exportDocx() {
+    if (state.busy) return;
+    state.busy = true;
+    showToast('正在生成 Word 文档...', 'info');
+    try {
+        const resp = await fetch(`/api/reports/${reportId}/docx`);
+        if (!resp.ok) {
+            let msg = '导出失败';
+            try { msg = (await resp.json()).detail || msg; } catch (e) { /* ignore */ }
+            throw new Error(msg);
+        }
+        const blob = await resp.blob();
+        const fname = `${state.studentName || '学生'}-${state.subjectName || ''}-冲刺学习计划.docx`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fname;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast('Word 文档已导出', 'success');
+    } catch (e) {
+        showToast('导出失败：' + e.message, 'error');
+    } finally {
+        state.busy = false;
+    }
+}
+
+function goBack() {
+    if (state.studentId && state.subjectId) {
+        location.hash = `#/student/${state.studentId}/subject/${state.subjectId}`;
+    } else {
+        location.hash = '#/students';
+    }
+}
+
+/* ---------- 初始化 ---------- */
+window.currentPageRefresh = loadReport;
+loadReport();
+
+/* ---------- IIFE 作用域导出：供内联 onclick 调用 ---------- */
+Object.assign(window, {
+    goBack, loadReport, editTitle, regenerateAll, showPlanVersions,
+    exportDocx, togglePublish, editSection, regenerateSection,
+    editSummary, regenerateSummary, editConclusion, regenerateConclusion, regeneratePlan,
+    addPlanRow, savePlan, deletePlanRow, previewPlanVersion, assignTeacherAll,
+});
+})();
+</script>

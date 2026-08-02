@@ -33,6 +33,7 @@
 </div>
 
 <script>
+(function () {
 const hashParts = location.hash.split('/');
 const studentId = parseInt(hashParts[2]);
 const routeSubjectId = hashParts[4] ? parseInt(hashParts[4]) : null;
@@ -242,6 +243,49 @@ function renderSubjectDetailPlaceholder() {
         `<p class="text-gray-300 text-center py-10">学科 #${sub.id} 的报告 / 规划 / 成绩 / 沟通日志功能将在后续版本实现</p>`;
 }
 
+async function renderReportTab() {
+    const box = document.getElementById('subject-tab-content');
+    box.innerHTML = '<p class="text-gray-300 text-center py-10">加载中...</p>';
+    try {
+        const r = await API.reports.list(currentSubjectId);
+        if (!r.success) throw new Error(r.error);
+        const list = r.data || [];
+        const rows = list.length
+            ? list.map(x => {
+                const st = Utils.statusLabel(x.status);
+                return `
+                <div class="flex items-center justify-between py-3 border-b" style="border-color:#f1f5f9;">
+                    <div class="min-w-0">
+                        <div class="text-sm text-gray-700 font-medium truncate">${Utils.escapeHtml(x.title || '学情报告')}</div>
+                        <div class="text-xs text-gray-400 mt-0.5">${Utils.formatDate(x.created_at, true)}</div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="px-2 py-0.5 rounded-full text-xs ${st.cls}">${st.text}</span>
+                        <button onclick="location.hash='#/report/${x.id}'" class="btn-outline" style="padding:5px 12px;font-size:12px;">查看</button>
+                    </div>
+                </div>`;
+            }).join('')
+            : '<p class="text-gray-300 text-center py-10">暂无报告</p>';
+        box.innerHTML = rows + `
+            <div class="text-center mt-4">
+                <button onclick="generateSubjectReport()" class="btn-primary" style="padding:7px 18px;">🔄 生成报告</button>
+            </div>`;
+    } catch (e) {
+        box.innerHTML = `<p class="text-red-400 text-center py-10">${Utils.escapeHtml(e.message)}</p>`;
+    }
+}
+
+async function generateSubjectReport() {
+    try {
+        const res = await API.reports.generate(currentSubjectId, {});
+        if (!res.success) throw new Error(res.error);
+        showToast('报告生成成功', 'success');
+        location.hash = `#/report/${res.data.id}`;
+    } catch (e) {
+        showToast('生成失败：' + e.message, 'error');
+    }
+}
+
 function switchSubjectTab(tab) {
     document.querySelectorAll('#subject-tabs [data-tab]').forEach(b => {
         const isActive = b.dataset.tab === tab;
@@ -252,8 +296,12 @@ function switchSubjectTab(tab) {
         else b.style.cssText = '';
     });
     const tabNames = { report: '📄 报告', plan: '📅 课程规划', scores: '📊 成绩', logs: '📝 沟通日志' };
-    document.getElementById('subject-tab-content').innerHTML =
-        `<p class="text-gray-300 text-center py-10">「${tabNames[tab]}」功能将在后续版本实现</p>`;
+    if (tab === 'report' && currentSubjectId) {
+        renderReportTab();
+    } else {
+        document.getElementById('subject-tab-content').innerHTML =
+            `<p class="text-gray-300 text-center py-10">「${tabNames[tab]}」功能将在后续版本实现</p>`;
+    }
 }
 
 /* ---------- 初始化 ---------- */
@@ -262,7 +310,7 @@ function refreshStudentDetail() {
     loadSubjects();
     if (currentSubjectId) {
         document.getElementById('subject-detail-area').classList.remove('hidden');
-        renderSubjectDetailPlaceholder();
+        renderReportTab();  // P5 起默认展示报告 Tab
     }
 }
 // 注册全局刷新（顶部「↻ 刷新」按钮 / 切回标签页自动调用）
@@ -271,7 +319,15 @@ window.currentPageRefresh = refreshStudentDetail;
 loadStudentDetail();
 if (routeSubjectId) {
     document.getElementById('subject-detail-area').classList.remove('hidden');
-    renderSubjectDetailPlaceholder();
+    renderReportTab();
 }
 loadSubjects();
+
+/* ---------- IIFE 作用域导出：供内联 onclick/onchange 调用 ---------- */
+Object.assign(window, {
+    changeStudentStatus, deleteStudent, editStudentInfo, toggleSubject,
+    generateSubjectReport, refreshStudentDetail, selectSubject,
+    showAddSubjectModal, switchSubjectTab,
+});
+})();
 </script>

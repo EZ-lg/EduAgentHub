@@ -7,7 +7,7 @@
     <script>
     // ===== 前端版本自愈机制：每次改动前端代码后递增 APP_VERSION，浏览器自动强制刷新一次 =====
     // 配合后端 no-store 缓存策略，保证用户永远加载到最新代码，无需手动清缓存
-    window.APP_VERSION = '8';
+    window.APP_VERSION = '13';
     (function () {
         try {
             var saved = localStorage.getItem('ta_app_ver');
@@ -30,13 +30,16 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Vue 3 -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
     <!-- Vue Router 4 -->
-    <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue-router@4/dist/vue-router.global.prod.js"></script>
     <!-- ECharts 5 -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <!-- jsPDF + html2canvas-pro（P5 报告 PDF 导出；pro 版兼容 oklch 颜色） -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.8/dist/html2canvas-pro.min.js"></script>
     <!-- 自定义样式（v 为版本号，改动前端后递增，强制浏览器刷新缓存） -->
-    <link rel="stylesheet" href="css/style.css?v=8">
+    <link rel="stylesheet" href="css/style.css?v=13">
 </head>
 <body>
     <div id="app">
@@ -65,8 +68,8 @@
 
     <toast-widget></toast-widget>
 
-    <script src="js/utils.js?v=8"></script>
-    <script src="js/api.js?v=8"></script>
-    <script src="js/app.js?v=8"></script>
+    <script src="js/utils.js?v=13"></script>
+    <script src="js/api.js?v=13"></script>
+    <script src="js/app.js?v=13"></script>
 </body>
 </html>

@@ -5,6 +5,11 @@
         ⚠️ 尚未配置 AI 服务。请先到 <a href="#/settings" class="text-blue-500 underline font-medium">系统设置</a> 配置 LLM 后，回来重新开始对话。
     </div>
 
+    <!-- 首问生成失败横幅（已配置但 AI 首次提问失败，可重试） -->
+    <div id="conv-retry-banner" class="hidden mb-4 px-4 py-3 rounded-lg bg-amber-50 border text-sm text-amber-700" style="border-color:#fde68a;">
+        ⚠️ AI 首次提问生成失败。<button onclick="retryFirstQuestion()" class="text-blue-500 underline font-medium ml-1">重新生成首问</button>
+    </div>
+
     <div class="panel flex flex-col" style="height:calc(100vh - 190px); padding:0; overflow:hidden;">
         <!-- 顶栏 -->
         <div class="flex items-center justify-between px-5 py-3 border-b" style="border-color:#f1f5f9;">
@@ -16,7 +21,7 @@
         </div>
 
         <!-- 消息区 -->
-        <div id="conv-messages" class="flex-1 overflow-y-auto px-5 py-4" style="background:#fbfbfc;"></div>
+        <div id="conv-messages" class="flex-1 overflow-y-auto px-5 py-4" style="background:#f8fafc;"></div>
 
         <!-- AI 认为信息已足够 → 结束建议条 -->
         <div id="conv-end-suggest" class="hidden px-5 py-2.5 text-xs flex items-center justify-between" style="background:#eff6ff; border-top:1px solid #dbeafe;">
@@ -26,13 +31,15 @@
 
         <!-- 输入区 -->
         <div id="conv-input-area" class="flex items-center gap-2 px-5 py-3 border-t" style="border-color:#f1f5f9;">
-            <input id="conv-input" class="flex-1" placeholder="输入学生信息，回车发送..." onkeydown="onInputKeydown(event)">
-            <button id="conv-send-btn" onclick="sendMessage()" class="btn-primary" style="padding:8px 22px;">发送</button>
+            <input id="conv-input" class="flex-1" style="border-radius:9999px; padding:9px 18px;"
+                placeholder="输入学生信息，回车发送..." onkeydown="onInputKeydown(event)">
+            <button id="conv-send-btn" onclick="sendMessage()" class="btn-primary" style="border-radius:9999px; padding:9px 24px; background:linear-gradient(135deg,#3b82f6,#2563eb);">发送</button>
         </div>
     </div>
 </div>
 
 <script>
+(function () {
 const subjectId = parseInt(location.hash.split('/')[2]);
 const state = {
     conversationId: null,
@@ -47,32 +54,48 @@ const state = {
 /* ---------- 渲染 ---------- */
 function scrollToBottom() {
     const box = document.getElementById('conv-messages');
-    box.scrollTop = box.scrollHeight;
+    box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
 }
 
 function renderBubble(m) {
     const isAi = m.role === 'ai';
-    const div = document.createElement('div');
-    div.className = isAi ? 'chat-bubble-ai' : 'chat-bubble-user';
-    div.innerHTML = Utils.escapeHtml((isAi ? '🤖 ' : '') + (m.content || '')).replace(/\n/g, '<br>');
-    return div;
+    const time = (m.time && typeof m.time === 'string' && m.time.length >= 16)
+        ? m.time.slice(11, 16)  // ISO "2026-08-02T13:02:..." → "13:02"
+        : '';
+    const row = document.createElement('div');
+    row.className = `conv-msg-row ${isAi ? 'conv-msg-ai' : 'conv-msg-user'}`;
+    const avatar = `<div class="conv-avatar ${isAi ? 'ai' : 'user'}">${isAi ? '🤖' : '👤'}</div>`;
+    const body = `<div class="conv-msg-body">` +
+        `<div class="conv-bubble ${isAi ? 'ai' : 'user'}">${Utils.escapeHtml(m.content || '')}</div>` +
+        (time ? `<div class="conv-msg-time">${time}</div>` : '') +
+        `</div>`;
+    row.innerHTML = isAi ? avatar + body : body + avatar;
+    return row;
 }
+
+// 页面是否仍挂载（导航走后旧异步不再操作已卸载 DOM）
+function pageAlive() { return !!document.getElementById('conv-messages'); }
 
 function renderMessages() {
     const container = document.getElementById('conv-messages');
+    if (!container) return;  // 已导航走，放弃渲染
     container.innerHTML = '';
     state.messages.forEach(m => container.appendChild(renderBubble(m)));
     scrollToBottom();
 }
 
 function setTyping(on) {
+    const container = document.getElementById('conv-messages');
+    if (!container) return;  // 已导航走
     let el = document.getElementById('conv-typing');
     if (on && !el) {
         el = document.createElement('div');
         el.id = 'conv-typing';
-        el.className = 'chat-bubble-ai';
-        el.innerHTML = '🤖 对方正在输入...';
-        document.getElementById('conv-messages').appendChild(el);
+        el.className = 'conv-msg-row conv-msg-ai';
+        el.innerHTML = `<div class="conv-avatar ai">🤖</div>` +
+            `<div class="conv-msg-body"><div class="conv-bubble ai"><span class="typing-dots">` +
+            `<span class="dot"></span><span class="dot"></span><span class="dot"></span></span></div></div>`;
+        container.appendChild(el);
         scrollToBottom();
     } else if (!on && el) {
         el.remove();
@@ -81,6 +104,18 @@ function setTyping(on) {
 
 function showEndSuggest() {
     document.getElementById('conv-end-suggest').classList.remove('hidden');
+}
+
+function hideEndSuggest() {
+    document.getElementById('conv-end-suggest').classList.add('hidden');
+}
+
+function showRetryBanner() {
+    document.getElementById('conv-retry-banner').classList.remove('hidden');
+}
+
+function hideRetryBanner() {
+    document.getElementById('conv-retry-banner').classList.add('hidden');
 }
 
 function showUnconfiguredBanner() {
@@ -102,7 +137,10 @@ function showCompleted(summary) {
     footer.style.borderColor = '#f1f5f9';
     footer.innerHTML = `
         <div class="text-sm text-green-600 font-medium">✅ 对话已结束，本次采集完成</div>
-        <button onclick="location.hash='#/student/${state.studentId}/subject/${subjectId}'" class="btn-primary" style="padding:7px 16px;font-size:13px;">返回学科详情</button>
+        <div class="flex items-center gap-2">
+            <button onclick="generateReport(this)" class="btn-primary" style="padding:7px 16px;font-size:13px;">📄 生成报告</button>
+            <button onclick="location.hash='#/student/${state.studentId}/subject/${subjectId}'" class="btn-outline" style="padding:7px 16px;font-size:13px;">返回学科详情</button>
+        </div>
     `;
     document.querySelector('.panel').appendChild(footer);
 }
@@ -125,7 +163,8 @@ async function sendMessage() {
         state.messages = d.messages || state.messages;
         state.status = d.status || state.status;
         renderMessages();
-        if (d.should_end) showEndSuggest();
+        // AI 认为信息足够 → 显示结束建议条；继续追问 → 隐藏（避免自相矛盾）
+        if (d.should_end) showEndSuggest(); else hideEndSuggest();
     } catch (e) {
         showToast('发送失败：' + e.message, 'error');
     } finally {
@@ -162,6 +201,53 @@ async function endConversation() {
     });
 }
 
+// 对话完成态 → 手动生成学情报告（P5），成功跳转报告页
+// btn 通过 onclick="generateReport(this)" 传入，不依赖全局 event（避免 undefined 抛错卡死）
+async function generateReport(btn) {
+    if (state.sending) return;
+    state.sending = true;
+    btn = btn || null;
+    const oldText = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '生成中...'; }
+    try {
+        const res = await API.reports.generate(subjectId, {});
+        if (!res.success) throw new Error(res.error);
+        showToast('报告生成成功', 'success');
+        location.hash = `#/report/${res.data.id}`;
+    } catch (e) {
+        if (btn) { btn.disabled = false; btn.textContent = oldText; }
+        showToast('生成失败：' + e.message, 'error');
+    } finally {
+        state.sending = false;
+    }
+}
+
+// 重试生成首问：重调 start（幂等安全：空会话+已配置才会重新生成）
+async function retryFirstQuestion() {
+    if (state.sending) return;
+    state.sending = true;
+    try {
+        const res = await API.conversations.start(subjectId);
+        if (!res.success) throw new Error(res.error);
+        const d = res.data;
+        state.conversationId = d.conversation.id;
+        state.messages = d.conversation.messages || [];
+        state.status = d.conversation.status;
+        state.configured = d.configured;
+        renderMessages();
+        if (d.first_question_failed) {
+            showToast('AI 仍无法生成首问，请检查 AI 配置或稍后再试', 'error');
+        } else {
+            hideRetryBanner();
+            showToast('已生成首问，请开始对话', 'success');
+        }
+    } catch (e) {
+        showToast('重试失败：' + e.message, 'error');
+    } finally {
+        state.sending = false;
+    }
+}
+
 /* ---------- 初始化 ---------- */
 async function initConversationPage() {
     // 1) 学科 + 学生信息（顶栏标题）
@@ -180,6 +266,7 @@ async function initConversationPage() {
     try {
         const res = await API.conversations.start(subjectId);
         if (!res.success) throw new Error(res.error);
+        if (!pageAlive()) return;  // 等待首问生成期间已导航走，放弃渲染
         const d = res.data;
         state.conversationId = d.conversation.id;
         state.messages = d.conversation.messages || [];
@@ -189,7 +276,9 @@ async function initConversationPage() {
         document.getElementById('conv-subtitle').textContent =
             d.configured ? `${d.student_name || ''} · 进行中` : 'AI 服务未配置';
         if (!d.configured) showUnconfiguredBanner();
+        if (d.first_question_failed) showRetryBanner();
     } catch (e) {
+        if (!pageAlive()) return;
         document.getElementById('conv-subtitle').textContent = '对话初始化失败：' + e.message;
         showToast('对话初始化失败：' + e.message, 'error');
     }
@@ -203,6 +292,7 @@ window.currentPageRefresh = async () => {
     try {
         const res = await API.conversations.start(subjectId);
         if (!res.success) return;
+        if (!pageAlive()) return;  // 刷新时已导航走
         const d = res.data;
         state.conversationId = d.conversation.id;
         state.messages = d.conversation.messages || [];
@@ -210,9 +300,18 @@ window.currentPageRefresh = async () => {
         state.configured = d.configured;
         renderMessages();
         document.getElementById('conv-input').value = val;
+        // 刷新后重置横幅/建议条，避免残留过期状态
+        hideEndSuggest();
         if (!d.configured) showUnconfiguredBanner();
+        if (d.first_question_failed) showRetryBanner(); else hideRetryBanner();
     } catch (e) { /* 静默，保持当前视图 */ }
 };
 
 initConversationPage();
+
+/* ---------- IIFE 作用域导出：供内联 onclick 调用（必须与页面 onclick 保持一致） ---------- */
+Object.assign(window, {
+    sendMessage, onInputKeydown, endConversation, generateReport, retryFirstQuestion,
+});
+})();
 </script>

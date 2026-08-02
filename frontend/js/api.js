@@ -67,6 +67,7 @@ window.API = {
         get(id) { return API.get(`/api/reports/${id}`); },
         update(id, data) { return API.put(`/api/reports/${id}`, data); },
         regenerate(id, data) { return API.post(`/api/reports/${id}/regenerate`, data || {}); },
+        pdf(id) { return API.get(`/api/reports/${id}/pdf`); },
     },
 
     // === 成绩 ===

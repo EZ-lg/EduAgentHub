@@ -139,6 +139,7 @@
 </div>
 
 <script>
+(function () {
 /* ============================================================
    系统设置页逻辑 — LLM / Embedding 配置
    ============================================================ */
@@ -342,4 +343,11 @@ function toggleKey(inputId, btn) {
 }
 
 initSettings();
+
+/* ---------- IIFE 作用域导出：供内联 onclick 调用 ---------- */
+Object.assign(window, {
+    saveLLM, saveEmbed, testLLM, testEmbed,
+    switchSettingsTab, toggleKey, onLLMProviderChange, onEmbProviderChange,
+});
+})();
 </script>
