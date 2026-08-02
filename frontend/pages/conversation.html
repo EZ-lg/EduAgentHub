@@ -1,9 +1,218 @@
-<!-- AI 对话采集页 -->
+<!-- AI 对话采集页 — 聊天式 UI -->
 <div class="fade-in">
-    <div class="text-center py-12 text-gray-400">
-        <div class="text-4xl mb-4">💬</div>
-        <p class="text-lg mb-2">AI 对话采集</p>
-        <p class="text-sm">此功能将在 P4 阶段实现</p>
-        <p class="text-xs text-gray-300 mt-4">对话 UI + AI 追问 + 自动结束判断 + 生成报告</p>
+    <!-- AI 未配置横幅 -->
+    <div id="conv-banner" class="hidden mb-4 px-4 py-3 rounded-lg bg-amber-50 border text-sm text-amber-700" style="border-color:#fde68a;">
+        ⚠️ 尚未配置 AI 服务。请先到 <a href="#/settings" class="text-blue-500 underline font-medium">系统设置</a> 配置 LLM 后，回来重新开始对话。
+    </div>
+
+    <div class="panel flex flex-col" style="height:calc(100vh - 190px); padding:0; overflow:hidden;">
+        <!-- 顶栏 -->
+        <div class="flex items-center justify-between px-5 py-3 border-b" style="border-color:#f1f5f9;">
+            <div>
+                <div class="font-semibold text-gray-800 text-sm" id="conv-title">AI 学情采集</div>
+                <div class="text-xs text-gray-400 mt-0.5" id="conv-subtitle">正在加载...</div>
+            </div>
+            <button id="conv-end-btn" onclick="endConversation()" class="btn-outline" style="padding:6px 16px;font-size:13px;">⏹ 提前结束</button>
+        </div>
+
+        <!-- 消息区 -->
+        <div id="conv-messages" class="flex-1 overflow-y-auto px-5 py-4" style="background:#fbfbfc;"></div>
+
+        <!-- AI 认为信息已足够 → 结束建议条 -->
+        <div id="conv-end-suggest" class="hidden px-5 py-2.5 text-xs flex items-center justify-between" style="background:#eff6ff; border-top:1px solid #dbeafe;">
+            <span class="text-blue-600">🤖 AI 认为信息已足够，可以结束对话并生成学情总结</span>
+            <button onclick="endConversation()" class="btn-primary" style="padding:5px 14px;font-size:12px;">结束对话</button>
+        </div>
+
+        <!-- 输入区 -->
+        <div id="conv-input-area" class="flex items-center gap-2 px-5 py-3 border-t" style="border-color:#f1f5f9;">
+            <input id="conv-input" class="flex-1" placeholder="输入学生信息，回车发送..." onkeydown="onInputKeydown(event)">
+            <button id="conv-send-btn" onclick="sendMessage()" class="btn-primary" style="padding:8px 22px;">发送</button>
+        </div>
     </div>
 </div>
+
+<script>
+const subjectId = parseInt(location.hash.split('/')[2]);
+const state = {
+    conversationId: null,
+    messages: [],
+    status: 'in_progress',
+    configured: false,
+    sending: false,
+    subjectName: '',
+    studentId: null,
+};
+
+/* ---------- 渲染 ---------- */
+function scrollToBottom() {
+    const box = document.getElementById('conv-messages');
+    box.scrollTop = box.scrollHeight;
+}
+
+function renderBubble(m) {
+    const isAi = m.role === 'ai';
+    const div = document.createElement('div');
+    div.className = isAi ? 'chat-bubble-ai' : 'chat-bubble-user';
+    div.innerHTML = Utils.escapeHtml((isAi ? '🤖 ' : '') + (m.content || '')).replace(/\n/g, '<br>');
+    return div;
+}
+
+function renderMessages() {
+    const container = document.getElementById('conv-messages');
+    container.innerHTML = '';
+    state.messages.forEach(m => container.appendChild(renderBubble(m)));
+    scrollToBottom();
+}
+
+function setTyping(on) {
+    let el = document.getElementById('conv-typing');
+    if (on && !el) {
+        el = document.createElement('div');
+        el.id = 'conv-typing';
+        el.className = 'chat-bubble-ai';
+        el.innerHTML = '🤖 对方正在输入...';
+        document.getElementById('conv-messages').appendChild(el);
+        scrollToBottom();
+    } else if (!on && el) {
+        el.remove();
+    }
+}
+
+function showEndSuggest() {
+    document.getElementById('conv-end-suggest').classList.remove('hidden');
+}
+
+function showUnconfiguredBanner() {
+    document.getElementById('conv-banner').classList.remove('hidden');
+    document.getElementById('conv-input').disabled = true;
+    document.getElementById('conv-send-btn').disabled = true;
+}
+
+function showCompleted(summary) {
+    state.status = 'completed';
+    document.getElementById('conv-input-area').classList.add('hidden');
+    document.getElementById('conv-end-suggest').classList.add('hidden');
+    document.getElementById('conv-end-btn').classList.add('hidden');
+    document.getElementById('conv-subtitle').textContent = '对话已结束 · 学情总结已生成';
+    document.getElementById('conv-completed-footer')?.remove();
+    const footer = document.createElement('div');
+    footer.id = 'conv-completed-footer';
+    footer.className = 'px-5 py-3 border-t flex items-center justify-between';
+    footer.style.borderColor = '#f1f5f9';
+    footer.innerHTML = `
+        <div class="text-sm text-green-600 font-medium">✅ 对话已结束，本次采集完成</div>
+        <button onclick="location.hash='#/student/${state.studentId}/subject/${subjectId}'" class="btn-primary" style="padding:7px 16px;font-size:13px;">返回学科详情</button>
+    `;
+    document.querySelector('.panel').appendChild(footer);
+}
+
+/* ---------- 交互 ---------- */
+async function sendMessage() {
+    const input = document.getElementById('conv-input');
+    const text = input.value.trim();
+    if (!text || state.sending || state.status !== 'in_progress' || !state.configured) return;
+    state.sending = true;
+    input.value = '';
+    // 乐观追加用户气泡，AI 回复前先展示
+    state.messages = state.messages.concat([{ role: 'user', content: text }]);
+    renderMessages();
+    setTyping(true);
+    try {
+        const res = await API.conversations.send(subjectId, { conversation_id: state.conversationId, message: text });
+        if (!res.success) throw new Error(res.error);
+        const d = res.data;
+        state.messages = d.messages || state.messages;
+        state.status = d.status || state.status;
+        renderMessages();
+        if (d.should_end) showEndSuggest();
+    } catch (e) {
+        showToast('发送失败：' + e.message, 'error');
+    } finally {
+        state.sending = false;
+        setTyping(false);
+    }
+}
+
+function onInputKeydown(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        sendMessage();
+    }
+}
+
+async function endConversation() {
+    if (state.sending || state.status !== 'in_progress') return;
+    Utils.confirmDialog({
+        title: '结束对话',
+        danger: true,
+        message: '结束对话后将生成学情总结，本次对话不可继续。<br>如需再次采集需重新建档。确定结束吗？',
+        onOk: async () => {
+            try {
+                const res = await API.conversations.end(subjectId, { conversation_id: state.conversationId });
+                if (!res.success) throw new Error(res.error);
+                const d = res.data;
+                state.messages = d.messages || state.messages;
+                renderMessages();
+                showCompleted(d.summary);
+            } catch (e) {
+                showToast('结束失败：' + e.message, 'error');
+            }
+        },
+    });
+}
+
+/* ---------- 初始化 ---------- */
+async function initConversationPage() {
+    // 1) 学科 + 学生信息（顶栏标题）
+    try {
+        const subRes = await API.subjects.get(subjectId);
+        if (!subRes.success) throw new Error(subRes.error);
+        state.subjectName = subRes.data.name;
+        state.studentId = subRes.data.student_id;
+        document.getElementById('conv-title').textContent = `${subRes.data.name}学科 · AI 学情采集`;
+    } catch (e) {
+        document.getElementById('conv-subtitle').textContent = '学科加载失败';
+        return;
+    }
+
+    // 2) start（幂等：恢复进行中会话，或新建 + 生成首问）
+    try {
+        const res = await API.conversations.start(subjectId);
+        if (!res.success) throw new Error(res.error);
+        const d = res.data;
+        state.conversationId = d.conversation.id;
+        state.messages = d.conversation.messages || [];
+        state.status = d.conversation.status;
+        state.configured = d.configured;
+        renderMessages();
+        document.getElementById('conv-subtitle').textContent =
+            d.configured ? `${d.student_name || ''} · 进行中` : 'AI 服务未配置';
+        if (!d.configured) showUnconfiguredBanner();
+    } catch (e) {
+        document.getElementById('conv-subtitle').textContent = '对话初始化失败：' + e.message;
+        showToast('对话初始化失败：' + e.message, 'error');
+    }
+}
+
+// 注册全局刷新（顶部「↻ 刷新」/切回标签页自动调用）
+// 注意：completed 状态不调 start（否则会新建空会话冲掉总结）；sending 中跳过
+window.currentPageRefresh = async () => {
+    if (state.sending || state.status === 'completed') return;
+    const val = document.getElementById('conv-input').value;
+    try {
+        const res = await API.conversations.start(subjectId);
+        if (!res.success) return;
+        const d = res.data;
+        state.conversationId = d.conversation.id;
+        state.messages = d.conversation.messages || [];
+        state.status = d.conversation.status;
+        state.configured = d.configured;
+        renderMessages();
+        document.getElementById('conv-input').value = val;
+        if (!d.configured) showUnconfiguredBanner();
+    } catch (e) { /* 静默，保持当前视图 */ }
+};
+
+initConversationPage();
+</script>

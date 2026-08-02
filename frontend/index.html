@@ -7,7 +7,7 @@
     <script>
     // ===== 前端版本自愈机制：每次改动前端代码后递增 APP_VERSION，浏览器自动强制刷新一次 =====
     // 配合后端 no-store 缓存策略，保证用户永远加载到最新代码，无需手动清缓存
-    window.APP_VERSION = '7';
+    window.APP_VERSION = '8';
     (function () {
         try {
             var saved = localStorage.getItem('ta_app_ver');
@@ -36,7 +36,7 @@
     <!-- ECharts 5 -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
     <!-- 自定义样式（v 为版本号，改动前端后递增，强制浏览器刷新缓存） -->
-    <link rel="stylesheet" href="css/style.css?v=7">
+    <link rel="stylesheet" href="css/style.css?v=8">
 </head>
 <body>
     <div id="app">
@@ -65,8 +65,8 @@
 
     <toast-widget></toast-widget>
 
-    <script src="js/utils.js?v=7"></script>
-    <script src="js/api.js?v=7"></script>
-    <script src="js/app.js?v=7"></script>
+    <script src="js/utils.js?v=8"></script>
+    <script src="js/api.js?v=8"></script>
+    <script src="js/app.js?v=8"></script>
 </body>
 </html>

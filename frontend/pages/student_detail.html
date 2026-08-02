@@ -166,7 +166,10 @@ async function loadSubjects() {
                 </div>
                 <div class="flex items-center justify-between text-xs">
                     <span class="${isActive ? 'text-green-500' : 'text-gray-400'}">${isActive ? '● 活跃' : '○ 已停用'}</span>
-                    <button onclick="event.stopPropagation();toggleSubject(${sub.id},'${sub.status}')" class="text-gray-300 hover:text-gray-500 text-xs">${isActive ? '停用' : '启用'}</button>
+                    <div class="flex items-center gap-2">
+                        <button onclick="event.stopPropagation();location.hash='#/conversation/${sub.id}'" class="text-gray-300 hover:text-blue-500 text-xs" title="进入 AI 对话采集">💬 对话</button>
+                        <button onclick="event.stopPropagation();toggleSubject(${sub.id},'${sub.status}')" class="text-gray-300 hover:text-gray-500 text-xs">${isActive ? '停用' : '启用'}</button>
+                    </div>
                 </div>
             </div>`;
         }).join('');
@@ -226,8 +229,8 @@ async function createSubject(name) {
         if (r.success) {
             showToast('学科创建成功', 'success');
             await loadSubjects();
-            // 选中新学科并展示详情区（P4 起可自动开启 AI 对话）
-            selectSubject(r.data.id);
+            // 自动进入 AI 对话采集（F3.2 / F4.1）
+            location.hash = '#/conversation/' + r.data.id;
         } else showToast('创建失败：' + (r.error || '未知错误'), 'error');
     } catch (e) { showToast('创建失败：' + e.message, 'error'); }
 }
