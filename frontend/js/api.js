@@ -74,6 +74,8 @@ window.API = {
     scores: {
         list(subjectId) { return API.get(`/api/subjects/${subjectId}/scores`); },
         create(subjectId, data) { return API.post(`/api/subjects/${subjectId}/scores`, data); },
+        batch(subjectId, data) { return API.post(`/api/subjects/${subjectId}/scores/batch`, data); },
+        analyze(subjectId) { return API.post(`/api/subjects/${subjectId}/scores/analyze`, {}); },
         update(id, data) { return API.put(`/api/scores/${id}`, data); },
         delete(id) { return API.delete(`/api/scores/${id}`); },
     },
@@ -82,6 +84,8 @@ window.API = {
     plans: {
         list(subjectId) { return API.get(`/api/subjects/${subjectId}/plans`); },
         create(subjectId, data) { return API.post(`/api/subjects/${subjectId}/plans`, data); },
+        save(subjectId, data) { return API.post(`/api/subjects/${subjectId}/plans/save`, data); },
+        adjust(subjectId) { return API.post(`/api/subjects/${subjectId}/plans/adjust`, {}); },
         update(id, data) { return API.put(`/api/plans/${id}`, data); },
         versions(id) { return API.get(`/api/plans/${id}/versions`); },
     },

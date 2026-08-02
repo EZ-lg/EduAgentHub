@@ -117,6 +117,13 @@ function createPageComponent(pageName, title) {
                 } catch (e) { console.error('看门狗异常:', e); }
             }, 6000);
         },
+        unmounted() {
+            // 导航离开时释放页面资源（ECharts 实例 / 全局监听器）
+            // 页面脚本在 IIFE 末尾注册 window.__pageUnmounted（见 student_detail 等页面）
+            try {
+                if (typeof window.__pageUnmounted === 'function') window.__pageUnmounted();
+            } catch (e) { console.error('页面卸载清理异常:', e); }
+        },
     };
 }
 

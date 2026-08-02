@@ -126,7 +126,7 @@ window.Utils = {
             } else if (f.type === 'textarea') {
                 input = `<textarea class="w-full" rows="${f.rows || 3}" placeholder="${Utils.escapeHtml(f.placeholder || '')}" data-key="${f.key}">${Utils.escapeHtml(String(val))}</textarea>`;
             } else {
-                const t = f.type === 'number' ? 'number' : (f.type === 'password' ? 'password' : 'text');
+                const t = f.type === 'number' ? 'number' : (f.type === 'password' ? 'password' : (f.type === 'date' ? 'date' : 'text'));
                 const minAttr = f.type === 'number' && f.min !== undefined ? ` min="${f.min}"` : '';
                 input = `<input type="${t}" class="w-full" value="${Utils.escapeHtml(String(val))}" placeholder="${Utils.escapeHtml(f.placeholder || '')}" data-key="${f.key}"${minAttr}>`;
             }

@@ -1,2 +1,30 @@
-# 课程规划调整 Prompt — P6 阶段完善
-# 变量：current_plan（JSON）, score_analysis, kb_context（可选）
+你是教培机构的课程规划专家。请基于「{{ student_name }}」同学「{{ subject_name }}」学科的成绩分析，对当前课程规划提出调整建议。
+
+【当前课程规划（JSON 数组）】
+{{ current_plan }}
+
+【成绩分析】
+{{ score_analysis }}
+
+{% if kb_context %}
+【知识库参考资料】（仅作事实参考，可引用其要点；未提及则忽略）
+{{ kb_context }}
+{% endif %}
+
+【调整要求】
+- 保持规划覆盖整个学期、8-20 条；字段齐全：lesson / content / hours / teacher_id / schedule / notes；hours 填数字。
+- 依据成绩分析调整：薄弱点所在章节增加课时、前移；表现好的章节适当减量但保留覆盖。
+- teacher_id 一律为 null（由教务后续统一指派教师），除非原规划该行已指定且应沿用。
+- 只依据成绩分析与当前规划调整，不编造。
+- reason —— 用 1-2 句话说明本次调整的原因（哪些成绩变化 → 对应做了哪些课时/顺序调整）。
+
+【输出要求】只输出一个 JSON 对象，不要 markdown 代码围栏，不要任何其他文字：
+{
+  "reason": "……",
+  "plan": [
+    {"lesson": "第1课", "content": "课程内容", "hours": 2, "teacher_id": null, "schedule": "每周六 09:00-11:00", "notes": ""}
+  ]
+}
+
+【约束】
+- plan 数组维持整学期覆盖；薄弱点着重并在对应行 notes 中注明「薄弱点重点突破」。

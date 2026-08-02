@@ -350,14 +350,23 @@ function collectPlanRows() {
     return rows;
 }
 
-async function savePlan() {
+function savePlan() {
     if (state.busy) return;
     const rows = collectPlanRows();
+    if (!rows.length) { showToast('课程规划不能为空', 'error'); return; }
     state.content.plan = rows;
     // 找到「六、」章，标记人工修改
     const ch = state.content.chapters.find(c => c && String(c.title || '').slice(0, 2) === PLAN_CHAPTER_PREFIX);
     if (ch) { ch.ai_generated = false; ch.last_modified = nowIso(); }
-    await persistReport(null, rows);
+    // 保存规划会新建课程规划版本（版本纪律，与 P6 规划 Tab 一致），询问调整原因（选填）
+    Utils.showModal({
+        title: '保存课程规划',
+        subtitle: '将生成课程规划的新版本（归档当前版本），便于回退',
+        fields: [{ key: 'reason', label: '调整原因（选填）', type: 'textarea', rows: 2, placeholder: '如：统一指派教师 / 调整课时分配' }],
+        onSubmit: async (data) => {
+            await persistReport(null, rows, (data.reason || '').trim());
+        },
+    });
 }
 
 /* ---------- 编辑/重生成 ---------- */
@@ -456,18 +465,27 @@ function regenerateAll() {
     doRegenerate('', '整份计划');
 }
 
-async function persistReport(extraPayload, planRows) {
+async function persistReport(extraPayload, planRows, planReason) {
     if (state.busy) return;
     state.busy = true;
     try {
+        // 1) 若本次有规划变更 → 保存为新版本（版本纪律），拿新 course_plan_id
+        let newPlanId = null;
+        if (planRows && Array.isArray(planRows)) {
+            const pr = await API.plans.save(state.subjectId, {
+                plan_json: planRows,
+                adjustment_reason: planReason || '报告页编辑保存',
+            });
+            if (!pr.success) throw new Error(pr.error);
+            newPlanId = pr.data.id;
+        }
+        // 2) 更新报告 content_json + 可选字段 + 指向最新规划版本
         const payload = { content_json: JSON.stringify(state.content) };
         if (extraPayload) Object.assign(payload, extraPayload);
+        if (newPlanId) payload.course_plan_id = newPlanId;
         const res = await API.reports.update(reportId, payload);
         if (!res.success) throw new Error(res.error);
         state.report = res.data;
-        if (state.report.course_plan_id && planRows) {
-            await API.plans.update(state.report.course_plan_id, { plan_json: JSON.stringify(planRows) });
-        }
         renderReport();
         showToast('已保存', 'success');
     } catch (e) {

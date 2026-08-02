@@ -7,7 +7,7 @@
     <script>
     // ===== 前端版本自愈机制：每次改动前端代码后递增 APP_VERSION，浏览器自动强制刷新一次 =====
     // 配合后端 no-store 缓存策略，保证用户永远加载到最新代码，无需手动清缓存
-    window.APP_VERSION = '13';
+    window.APP_VERSION = '14';
     (function () {
         try {
             var saved = localStorage.getItem('ta_app_ver');
@@ -39,7 +39,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.8/dist/html2canvas-pro.min.js"></script>
     <!-- 自定义样式（v 为版本号，改动前端后递增，强制浏览器刷新缓存） -->
-    <link rel="stylesheet" href="css/style.css?v=13">
+    <link rel="stylesheet" href="css/style.css?v=14">
 </head>
 <body>
     <div id="app">
@@ -68,8 +68,8 @@
 
     <toast-widget></toast-widget>
 
-    <script src="js/utils.js?v=13"></script>
-    <script src="js/api.js?v=13"></script>
-    <script src="js/app.js?v=13"></script>
+    <script src="js/utils.js?v=14"></script>
+    <script src="js/api.js?v=14"></script>
+    <script src="js/app.js?v=14"></script>
 </body>
 </html>

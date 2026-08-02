@@ -286,6 +286,348 @@ async function generateSubjectReport() {
     }
 }
 
+/* ---------- P6 通用辅助 ---------- */
+function esc(s) { return Utils.escapeHtml(String(s ?? '')); }
+
+function safeParse(str, fallback) {
+    try { return JSON.parse(str || 'null') || fallback; } catch (e) { return fallback; }
+}
+
+function fmtNum(n) {
+    const v = Number(n);
+    if (isNaN(v)) return '-';
+    return Number.isInteger(v) ? String(v) : v.toFixed(1);
+}
+
+function pctText(score, total) {
+    if (!total || total <= 0) return '-';
+    return (score / total * 100).toFixed(1) + '%';
+}
+
+/* ============================================================
+ * 成绩 Tab（P6 F6.1-F6.5）
+ * ============================================================ */
+let scoresList = [];
+let scoreChart = null;
+let scoreChartMode = 'percent';
+let scoreChartData = [];
+let goalPercent = null;   // AI 分析返回的目标百分比，画参考线用
+
+function parseBatchLines(text) {
+    const errors = [];
+    const items = [];
+    const lines = String(text || '').split(/\r?\n/);
+    lines.forEach((raw, idx) => {
+        const line = raw.trim();
+        if (!line) return;
+        const parts = line.split(/[,，]/).map(s => s.trim());
+        if (parts.length < 2 || !parts[1]) {
+            errors.push(`第${idx + 1}行：缺少分数`);
+            return;
+        }
+        const score = Number(parts[1]);
+        if (isNaN(score) || score < 0) {
+            errors.push(`第${idx + 1}行：分数「${parts[1]}」无效`);
+            return;
+        }
+        let total = 100;
+        if (parts[2]) {
+            total = Number(parts[2]);
+            if (isNaN(total) || total <= 0) {
+                errors.push(`第${idx + 1}行：满分「${parts[2]}」无效`);
+                return;
+            }
+        }
+        let date = '';
+        if (parts[3]) {
+            const m = parts[3].replace(/\//g, '-').match(/^\d{4}-\d{2}-\d{2}/);
+            if (m) date = m[0];
+        }
+        items.push({
+            exam_name: parts[0],
+            score,
+            total_score: total,
+            exam_date: date,
+            notes: parts[4] || '',
+        });
+    });
+    return { items, errors };
+}
+
+async function renderScoresTab() {
+    const box = document.getElementById('subject-tab-content');
+    if (!box) return;
+    box.innerHTML = '<p class="text-gray-300 text-center py-10">加载中...</p>';
+    goalPercent = null;
+    try {
+        const r = await API.scores.list(currentSubjectId);
+        scoresList = (r.success && r.data) ? r.data : [];
+    } catch (e) { scoresList = []; }
+    if (!box.isConnected) return;   // 导航走开则放弃渲染
+    box.innerHTML = buildScoresHtml();
+    renderScoreList();
+    initScoreChart(scoresList);
+}
+
+function buildScoresHtml() {
+    const chartBody = scoresList.length
+        ? '<div id="score-chart" class="chart-container" style="height:280px;"></div>'
+        : '<div id="score-chart" class="text-gray-400 text-center py-14">暂无成绩数据，先录入成绩</div>';
+    return `
+        <div id="scores-tab">
+            <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <div class="flex gap-2 flex-wrap">
+                    <button onclick="showAddScoreModal()" class="btn-outline" style="padding:6px 14px;font-size:13px;">➕ 录入成绩</button>
+                    <button onclick="showBatchScoreModal()" class="btn-outline" style="padding:6px 14px;font-size:13px;">📥 批量录入</button>
+                    <button onclick="runScoreAnalysis()" class="btn-primary" style="padding:6px 14px;font-size:13px;">🤖 AI 成绩分析</button>
+                    ${scoresList.length < 2 ? '<span class="text-xs text-gray-400 self-center">少于 2 次成绩时趋势参考有限</span>' : ''}
+                </div>
+                <div class="flex gap-1">
+                    <button data-chart-mode="percent" onclick="setScoreChartMode('percent')" class="btn-primary" style="padding:5px 12px;font-size:12px;">百分制</button>
+                    <button data-chart-mode="raw" onclick="setScoreChartMode('raw')" class="btn-outline" style="padding:5px 12px;font-size:12px;">原始分</button>
+                </div>
+            </div>
+            ${chartBody}
+            <div id="score-analysis-panel" class="hidden mt-4"></div>
+            <table class="w-full text-sm mt-4" style="min-width:720px;">
+                <thead>
+                    <tr>
+                        <th>考试</th><th style="width:120px;">日期</th><th style="width:80px;">分数</th>
+                        <th style="width:80px;">满分</th><th style="width:90px;">百分制</th><th>备注</th><th style="width:110px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="scores-tbody"></tbody>
+            </table>
+        </div>`;
+}
+
+function renderScoreList() {
+    const tbody = document.getElementById('scores-tbody');
+    if (!tbody) return;
+    if (!scoresList.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-8">暂无成绩，点击上方「➕ 录入成绩」</td></tr>';
+        return;
+    }
+    tbody.innerHTML = scoresList.map(s => `
+        <tr class="border-b" style="border-color:#f1f5f9;">
+            <td class="py-2 font-medium text-gray-700">${esc(s.exam_name) || '-'}</td>
+            <td class="py-2 text-gray-500">${Utils.formatDate(s.exam_date)}</td>
+            <td class="py-2 text-gray-700 font-medium">${fmtNum(s.score)}</td>
+            <td class="py-2 text-gray-500">${fmtNum(s.total_score)}</td>
+            <td class="py-2 ${s.total_score > 0 ? 'text-blue-600 font-medium' : 'text-gray-400'}">${pctText(s.score, s.total_score)}</td>
+            <td class="py-2 text-gray-400 truncate" style="max-width:160px;">${esc(s.notes)}</td>
+            <td class="py-2">
+                <button onclick="editScore(${s.id})" class="text-xs text-gray-400 hover:text-blue-500 mr-2" title="编辑">✏️</button>
+                <button onclick="deleteScore(${s.id})" class="text-xs text-gray-300 hover:text-red-500" title="删除">🗑️</button>
+            </td>
+        </tr>`).join('');
+}
+
+function showAddScoreModal(editId) {
+    let values = {};
+    if (editId) {
+        const s = scoresList.find(x => x.id === editId);
+        if (s) {
+            values = {
+                exam_name: s.exam_name,
+                score: s.score,
+                total_score: s.total_score,
+                exam_date: (s.exam_date || '').slice(0, 10),
+                notes: s.notes,
+            };
+        }
+    }
+    Utils.showModal({
+        title: editId ? '编辑成绩' : '录入成绩',
+        subtitle: '记录一次考试成绩',
+        width: 520,
+        fields: [
+            { key: 'exam_name', label: '考试名称', required: true, placeholder: '如：期中考试 / 月考 / 期末' },
+            { key: 'score', label: '分数', type: 'number', required: true, placeholder: '实际得分', min: 0 },
+            { key: 'total_score', label: '满分', type: 'number', required: true, placeholder: '默认 100', min: 1 },
+            { key: 'exam_date', label: '考试日期', type: 'date' },
+            { key: 'notes', label: '备注', type: 'textarea', rows: 2, placeholder: '选填' },
+        ],
+        values,
+        onSubmit: async (data) => {
+            if (!data.exam_date) data.exam_date = new Date().toISOString().slice(0, 10);
+            try {
+                const r = editId
+                    ? await API.scores.update(editId, data)
+                    : await API.scores.create(currentSubjectId, data);
+                if (r.success) { showToast(editId ? '成绩已更新' : '成绩已录入', 'success'); renderScoresTab(); }
+                else showToast('保存失败：' + (r.error || '未知错误'), 'error');
+            } catch (e) { showToast('保存失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+function editScore(id) { showAddScoreModal(id); }
+
+function deleteScore(id) {
+    Utils.confirmDialog({
+        title: '删除成绩',
+        message: '确定删除这条成绩记录？',
+        danger: true,
+        onOk: async () => {
+            try {
+                const r = await API.scores.delete(id);
+                if (r.success) { showToast('已删除', 'success'); renderScoresTab(); }
+                else showToast('删除失败：' + (r.error || '未知错误'), 'error');
+            } catch (e) { showToast('删除失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+function showBatchScoreModal() {
+    Utils.showModal({
+        title: '批量录入成绩',
+        subtitle: '每行一条：考试名称,分数,满分(可省,默认100),日期(可省,默认今天),备注(可省)',
+        width: 640,
+        fields: [
+            { key: 'lines', label: '成绩数据', type: 'textarea', rows: 8, required: true,
+              placeholder: '期中考试,65,120,2026-07-10\n月考,78,120,2026-08-02\n期末,85,120' },
+        ],
+        onSubmit: async (data) => {
+            const { items, errors } = parseBatchLines(data.lines);
+            if (errors.length) showToast(`有 ${errors.length} 行格式错误（已跳过）：${errors[0]}`, 'error');
+            if (!items.length) { showToast('没有可录入的有效成绩', 'error'); return; }
+            try {
+                const r = await API.scores.batch(currentSubjectId, { items });
+                if (r.success) { showToast(`成功录入 ${r.data.inserted} 条成绩`, 'success'); renderScoresTab(); }
+                else showToast('录入失败：' + (r.error || '未知错误'), 'error');
+            } catch (e) { showToast('录入失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+/* ---------- ECharts 曲线（生命周期安全） ---------- */
+function disposeScoreChart() {
+    if (scoreChart) { scoreChart.dispose(); scoreChart = null; }
+}
+function onScoreChartResize() {
+    if (scoreChart && document.getElementById('score-chart')) scoreChart.resize();
+}
+
+function initScoreChart(scores) {
+    const el = document.getElementById('score-chart');
+    if (!el) return;
+    disposeScoreChart();
+    if (!scores || !scores.length || typeof echarts === 'undefined') return;
+    scoreChartData = scores;
+    scoreChart = echarts.init(el);
+    scoreChart.setOption(buildScoreOption(scores, scoreChartMode));
+}
+
+function buildScoreOption(scores, mode) {
+    const asc = [...scores].sort((a, b) => new Date(a.exam_date) - new Date(b.exam_date));
+    const x = asc.map(s => Utils.formatDate(s.exam_date));
+    const y = asc.map(s => mode === 'percent'
+        ? (s.total_score > 0 ? +(s.score / s.total_score * 100).toFixed(1) : 0)
+        : s.score);
+    const markLine = (mode === 'percent' && goalPercent)
+        ? {
+            silent: true, symbol: 'none',
+            label: { formatter: `目标 ${goalPercent}%`, color: '#dc2626', position: 'insideEndTop' },
+            lineStyle: { color: '#dc2626', type: 'dashed', width: 1 },
+            data: [{ yAxis: goalPercent }],
+        }
+        : undefined;
+    return {
+        tooltip: {
+            trigger: 'axis',
+            formatter: (params) => {
+                const s = asc[params[0].dataIndex];
+                return `${Utils.formatDate(s.exam_date)}<br/>${esc(s.exam_name || '考试')}<br/><b>${fmtNum(s.score)}/${fmtNum(s.total_score)}</b> 分（${pctText(s.score, s.total_score)}）`;
+            },
+        },
+        grid: { left: 50, right: 24, top: 36, bottom: 30 },
+        xAxis: { type: 'category', data: x, boundaryGap: false },
+        yAxis: { type: 'value', name: mode === 'percent' ? '百分制' : '原始分', min: mode === 'percent' ? 0 : undefined },
+        series: [{
+            name: mode === 'percent' ? '百分制' : '原始分',
+            type: 'line',
+            data: y,
+            smooth: true,
+            symbolSize: 8,
+            lineStyle: { width: 2, color: '#2563eb' },
+            itemStyle: { color: '#2563eb' },
+            markLine,
+        }],
+    };
+}
+
+function setScoreChartMode(mode) {
+    scoreChartMode = mode;
+    const el = document.getElementById('score-chart');
+    if (scoreChart && el) scoreChart.setOption(buildScoreOption(scoreChartData, mode), true);
+    document.querySelectorAll('[data-chart-mode]').forEach(b => {
+        const active = b.dataset.chartMode === mode;
+        b.className = active ? 'btn-primary' : 'btn-outline';
+        b.style.cssText = 'padding:5px 12px;font-size:12px;';
+    });
+}
+
+/* ---------- AI 成绩分析 ---------- */
+async function runScoreAnalysis() {
+    if (!scoresList.length) { showToast('请先录入成绩', 'error'); return; }
+    const panel = document.getElementById('score-analysis-panel');
+    if (panel) {
+        panel.classList.remove('hidden');
+        panel.innerHTML = '<p class="text-gray-400 text-center py-6">🤖 AI 正在分析成绩趋势，请稍候…</p>';
+    }
+    try {
+        const r = await API.scores.analyze(currentSubjectId);
+        if (!r.success) throw new Error(r.error);
+        const a = r.data.analysis || {};
+        goalPercent = a.goal_percent || null;
+        renderScoreAnalysis(panel, a);
+        if (scoreChart) scoreChart.setOption(buildScoreOption(scoreChartData, scoreChartMode), true);
+        showToast('成绩分析完成', 'success');
+    } catch (e) {
+        if (panel) { panel.classList.add('hidden'); panel.innerHTML = ''; }
+        showToast('分析失败：' + e.message, 'error');
+    }
+}
+
+function renderScoreAnalysis(panel, a) {
+    const trendColor = {
+        '上升': 'text-green-600 bg-green-50',
+        '平稳': 'text-blue-600 bg-blue-50',
+        '波动': 'text-yellow-600 bg-yellow-50',
+        '下降': 'text-red-600 bg-red-50',
+        '上升后回落': 'text-orange-600 bg-orange-50',
+    };
+    const trendCls = trendColor[a.trend] || 'text-gray-600 bg-gray-50';
+    const weakHtml = (a.weak_points || []).map(w =>
+        `<li class="text-sm text-gray-600">${esc(w.area)}${w.detail ? `<span class="text-gray-400"> — ${esc(w.detail)}</span>` : ''}</li>`).join('')
+        || '<li class="text-sm text-gray-400">暂无薄弱点标注</li>';
+    const suggHtml = (a.suggestions || []).map(s => `<li class="text-sm text-gray-600">${esc(s)}</li>`).join('')
+        || '<li class="text-sm text-gray-400">暂无建议</li>';
+    if (!panel) return;
+    panel.classList.remove('hidden');
+    panel.innerHTML = `
+        <div class="rounded-xl border p-4" style="border-color:#e2e8f0;background:#f8faff;">
+            <div class="flex items-center gap-3 mb-3 flex-wrap">
+                <span class="font-semibold text-gray-700 text-sm">🤖 AI 成绩分析</span>
+                <span class="px-2 py-0.5 rounded-full text-xs ${trendCls}">趋势：${esc(a.trend || '-')}</span>
+                ${goalPercent ? `<span class="px-2 py-0.5 rounded-full text-xs bg-red-50 text-red-600">目标参考线 ${goalPercent}%</span>` : ''}
+            </div>
+            ${a.trend_detail ? `<p class="text-sm text-gray-600 mb-3">${esc(a.trend_detail)}</p>` : ''}
+            <div class="grid md:grid-cols-2 gap-4">
+                <div>
+                    <div class="text-xs font-semibold text-gray-400 mb-1">🔻 薄弱点</div>
+                    <ul class="list-disc pl-4 space-y-1">${weakHtml}</ul>
+                </div>
+                <div>
+                    <div class="text-xs font-semibold text-gray-400 mb-1">📈 学习建议</div>
+                    <ol class="list-decimal pl-4 space-y-1">${suggHtml}</ol>
+                </div>
+            </div>
+            ${a.gap_analysis ? `<div class="mt-3 pt-3 border-t text-sm text-gray-600" style="border-color:#e2e8f0;"><span class="text-xs font-semibold text-gray-400 mr-2">🎯 与目标差距</span>${esc(a.gap_analysis)}</div>` : ''}
+        </div>`;
+}
+
 function switchSubjectTab(tab) {
     document.querySelectorAll('#subject-tabs [data-tab]').forEach(b => {
         const isActive = b.dataset.tab === tab;
@@ -298,10 +640,312 @@ function switchSubjectTab(tab) {
     const tabNames = { report: '📄 报告', plan: '📅 课程规划', scores: '📊 成绩', logs: '📝 沟通日志' };
     if (tab === 'report' && currentSubjectId) {
         renderReportTab();
+    } else if (tab === 'scores' && currentSubjectId) {
+        renderScoresTab();
+    } else if (tab === 'plan' && currentSubjectId) {
+        renderPlanTab();
     } else {
         document.getElementById('subject-tab-content').innerHTML =
             `<p class="text-gray-300 text-center py-10">「${tabNames[tab]}」功能将在后续版本实现</p>`;
     }
+}
+
+/* ============================================================
+ * 课程规划 Tab（P6 F6.6-F6.8）
+ * ============================================================ */
+let planList = [];
+let planActive = null;      // 当前 active 版本
+let planRows = [];          // 表格当前数据
+let planTeachers = [];
+let planBusy = false;
+
+async function renderPlanTab() {
+    const box = document.getElementById('subject-tab-content');
+    if (!box) return;
+    box.innerHTML = '<p class="text-gray-300 text-center py-10">加载中...</p>';
+    await loadPlanData();
+    if (!box.isConnected) return;   // 导航走开则放弃渲染
+    drawPlanTab();
+}
+
+async function loadPlanData() {
+    try {
+        const [pr, tr] = await Promise.all([
+            API.plans.list(currentSubjectId),
+            API.teachers.list(),
+        ]);
+        planList = (pr.success && pr.data) ? pr.data : [];
+        planTeachers = (tr.success && tr.data) ? tr.data : [];
+    } catch (e) { planList = []; planTeachers = []; }
+    planActive = planList.find(p => p.status === 'active') || planList[0] || null;
+    planRows = planActive ? safeParse(planActive.plan_json, []) : [];
+    if (!Array.isArray(planRows)) planRows = [];
+}
+
+function drawPlanTab() {
+    const box = document.getElementById('subject-tab-content');
+    if (!box) return;
+    // 快照当前输入（含未保存编辑），重渲染后恢复
+    const snap = snapshotPlanInputsTab();
+    box.innerHTML = buildPlanHtml();
+    restorePlanInputsTab(snap);
+}
+
+function buildPlanHtml() {
+    if (!planActive) {
+        return `<div class="text-center py-12">
+            <div class="text-gray-400 text-sm mb-3">暂无课程规划。先生成报告即可自动创建整学期课程规划。</div>
+            <button onclick="generateSubjectReport()" class="btn-primary" style="padding:8px 18px;">🔄 生成报告（含课程规划）</button>
+        </div>`;
+    }
+    const commonTid = planRows.length && planRows.every(r => r.teacher_id === planRows[0].teacher_id)
+        ? planRows[0].teacher_id : '';
+    return `
+        <div id="plan-tab">
+            <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <div class="flex items-center gap-2">
+                    <span class="font-semibold text-gray-700 text-sm">📅 课程规划</span>
+                    <span class="px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-600">v${planActive.version}</span>
+                    <span class="text-xs text-gray-400">${Utils.formatDate(planActive.created_at, true)}</span>
+                    ${planActive.status === 'active' ? '<span class="text-xs text-green-600">当前</span>' : ''}
+                </div>
+                <div class="flex gap-2 flex-wrap">
+                    <button onclick="runPlanAdjust()" class="btn-primary" style="padding:6px 14px;font-size:13px;">🤖 AI 课程调整</button>
+                    <button onclick="showPlanVersions()" class="btn-outline" style="padding:6px 14px;font-size:13px;">📜 版本历史</button>
+                </div>
+            </div>
+            ${planActive.adjustment_reason ? `<div class="rounded-lg px-3 py-2 mb-3 text-sm bg-amber-50 text-amber-700" style="border-left:4px solid #f59e0b;">💡 ${esc(planActive.adjustment_reason)}</div>` : ''}
+            <div id="plan-adjust-panel" class="hidden mb-3"></div>
+            <div class="flex items-center gap-2 mb-2">
+                <span class="text-xs text-gray-500 font-medium">👨‍🏫 统一指派教师：</span>
+                <select id="plan-teacher-all" onchange="assignTeacherAllPlan(this.value)" class="text-sm" style="width:200px;padding:4px 10px;">
+                    <option value="">— 不指定 —</option>
+                    ${planTeachers.map(t => `<option value="${t.id}" ${t.id == commonTid ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm" style="min-width:720px;">
+                    <thead><tr>
+                        <th style="width:90px;">课时</th><th>课程内容</th><th style="width:70px;">课时数</th>
+                        <th style="width:120px;">教师</th><th style="width:160px;">时间安排</th><th style="width:130px;">备注</th><th style="width:40px;"></th>
+                    </tr></thead>
+                    <tbody id="plan-tbody">
+                        ${planRows.map((row, j) => planRowHtmlTab(row, j)).join('') || '<tr><td colspan="7" class="text-center text-gray-400 py-4">暂无课程，点击下方「➕ 新增行」</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+            <div class="flex gap-2 mt-3">
+                <button onclick="addPlanRowTab()" class="btn-outline" style="padding:5px 14px;font-size:12px;">➕ 新增行</button>
+                <button onclick="savePlanVersion()" class="btn-primary" style="padding:5px 14px;font-size:12px;">💾 保存为新版本</button>
+            </div>
+        </div>`;
+}
+
+function planRowHtmlTab(row, i) {
+    const teacherOpts = ['<option value="">未指派</option>']
+        .concat(planTeachers.map(t => `<option value="${t.id}" ${t.id == row.teacher_id ? 'selected' : ''}>${esc(t.name)}</option>`))
+        .join('');
+    return `
+        <tr>
+            <td><input data-plan="lesson" data-i="${i}" value="${esc(row.lesson)}" class="w-full" style="min-width:70px;" placeholder="第1课"></td>
+            <td><input data-plan="content" data-i="${i}" value="${esc(row.content)}" class="w-full" placeholder="课程内容"></td>
+            <td><input data-plan="hours" data-i="${i}" type="number" min="0" value="${row.hours ?? ''}" class="w-full" style="min-width:50px;"></td>
+            <td><select data-plan="teacher_id" data-i="${i}" class="w-full">${teacherOpts}</select></td>
+            <td><input data-plan="schedule" data-i="${i}" value="${esc(row.schedule)}" class="w-full" style="min-width:120px;" placeholder="每周一 18:00"></td>
+            <td><input data-plan="notes" data-i="${i}" value="${esc(row.notes)}" class="w-full" style="min-width:100px;"></td>
+            <td><button onclick="deletePlanRowTab(${i})" class="btn-outline" style="padding:3px 8px;font-size:12px;color:#dc2626;">🗑️</button></td>
+        </tr>`;
+}
+
+function snapshotPlanInputsTab() {
+    const snap = {};
+    document.querySelectorAll('#plan-tab [data-plan]').forEach(el => {
+        snap[el.dataset.plan + '_' + el.dataset.i] = el.value;
+    });
+    return snap;
+}
+function restorePlanInputsTab(snap) {
+    document.querySelectorAll('#plan-tab [data-plan]').forEach(el => {
+        const v = snap[el.dataset.plan + '_' + el.dataset.i];
+        if (v !== undefined) el.value = v;
+    });
+}
+
+function collectPlanRowsTab() {
+    const inputs = document.querySelectorAll('#plan-tab [data-plan]');
+    if (!inputs.length) return [];
+    let maxI = -1;
+    inputs.forEach(el => { const n = parseInt(el.dataset.i); if (n > maxI) maxI = n; });
+    const rows = [];
+    for (let i = 0; i <= maxI; i++) {
+        const q = k => document.querySelector(`#plan-tab [data-plan="${k}"][data-i="${i}"]`);
+        const lesson = q('lesson')?.value?.trim() || '';
+        const content = q('content')?.value?.trim() || '';
+        if (!lesson && !content) continue; // 跳过空行
+        const tidRaw = q('teacher_id')?.value;
+        const tid = tidRaw && tidRaw !== '' ? parseInt(tidRaw) : null;
+        const teacherName = tid && planTeachers.length
+            ? (planTeachers.find(t => t.id === tid)?.name || '') : '';
+        rows.push({
+            lesson,
+            content,
+            hours: q('hours')?.value !== '' ? Number(q('hours')?.value) : null,
+            teacher_id: tid,
+            teacher_name: teacherName,
+            schedule: q('schedule')?.value?.trim() || '',
+            notes: q('notes')?.value?.trim() || '',
+        });
+    }
+    return rows;
+}
+
+function addPlanRowTab() {
+    const maxLesson = planRows.reduce((m, r) => {
+        const n = parseInt(r.lesson);
+        return !isNaN(n) && n > m ? n : m;
+    }, 0);
+    planRows.push({ lesson: `第${maxLesson + 1}课`, content: '', hours: null, teacher_id: null, teacher_name: '', schedule: '', notes: '' });
+    drawPlanTab();
+}
+
+function deletePlanRowTab(i) {
+    if (!planRows.length) return;
+    planRows.splice(i, 1);
+    drawPlanTab();
+}
+
+function assignTeacherAllPlan(tid) {
+    const teacher = planTeachers.find(t => t.id == tid);
+    const newTid = tid ? parseInt(tid) : null;
+    planRows.forEach(row => {
+        row.teacher_id = newTid;
+        row.teacher_name = teacher ? teacher.name : '';
+    });
+    drawPlanTab();
+    showToast(newTid ? `已统一指派教师：${teacher ? teacher.name : ''}` : '已清除教师指派', 'success');
+}
+
+async function savePlanVersion() {
+    if (planBusy) return;
+    const rows = collectPlanRowsTab();
+    if (!rows.length) { showToast('课程规划不能为空', 'error'); return; }
+    Utils.showModal({
+        title: '保存为新版本',
+        subtitle: '每次保存生成一个新版本（归档当前版本），便于后续回退',
+        fields: [{ key: 'reason', label: '调整原因（必填）', type: 'textarea', rows: 2, required: true, placeholder: '如：月考后针对函数薄弱点增加课时' }],
+        onSubmit: async (data) => {
+            planBusy = true;
+            showToast('正在保存…', 'info');
+            try {
+                const r = await API.plans.save(currentSubjectId, { plan_json: rows, adjustment_reason: data.reason });
+                if (!r.success) throw new Error(r.error);
+                showToast(`已保存为 v${r.data.version}`, 'success');
+                renderPlanTab();
+            } catch (e) { showToast('保存失败：' + e.message, 'error'); }
+            finally { planBusy = false; }
+        },
+    });
+}
+
+async function runPlanAdjust() {
+    if (planBusy) return;
+    if (!planActive) { showToast('暂无课程规划，请先生成报告', 'error'); return; }
+    // 有成绩才能基于成绩调整
+    try {
+        const sr = await API.scores.list(currentSubjectId);
+        if (!sr.success || !(sr.data || []).length) { showToast('请先在成绩 Tab 录入成绩', 'error'); return; }
+    } catch (e) { showToast('请先在成绩 Tab 录入成绩', 'error'); return; }
+    planBusy = true;
+    showToast('🤖 AI 正在基于成绩分析调整课程规划，请稍候…', 'info');
+    try {
+        const r = await API.plans.adjust(currentSubjectId);
+        if (!r.success) throw new Error(r.error);
+        planRows = r.data.proposed_plan || [];
+        const a = r.data.analysis || {};
+        const panelHtml = `
+            <div class="rounded-lg border p-3" style="border-color:#f59e0b;background:#fffbeb;">
+                <div class="flex items-center gap-2 mb-1 flex-wrap">
+                    <span class="font-semibold text-sm text-amber-700">🤖 AI 调整建议已载入表格（尚未保存）</span>
+                    <span class="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700">趋势：${esc(a.trend || '-')}</span>
+                </div>
+                ${r.data.reason ? `<p class="text-sm text-amber-800 mb-1">💡 调整原因：${esc(r.data.reason)}</p>` : ''}
+                <p class="text-xs text-amber-600">请核对下方表格，确认后点「💾 保存为新版本」；不保存则切换离开后丢弃。</p>
+            </div>`;
+        drawPlanTab();   // 先重建 DOM，再填充面板（避免被重建重置为 hidden）
+        const panel = document.getElementById('plan-adjust-panel');
+        if (panel) {
+            panel.classList.remove('hidden');
+            panel.innerHTML = panelHtml;
+        }
+        showToast('AI 调整建议已载入，请核对后保存为新版本', 'success');
+    } catch (e) {
+        showToast('调整失败：' + e.message, 'error');
+    } finally {
+        planBusy = false;
+    }
+}
+
+async function showPlanVersions() {
+    if (!planList.length) { showToast('暂无课程规划', 'info'); return; }
+    const html = planList.map(v => `
+        <div class="flex items-center justify-between py-2 border-b" style="border-color:#f1f5f9;">
+            <div class="min-w-0">
+                <span class="font-medium text-gray-700">v${v.version}</span>
+                <span class="ml-2 text-xs text-gray-400">${Utils.formatDate(v.created_at, true)}</span>
+                ${v.status === 'active'
+                    ? '<span class="ml-2 text-xs text-green-600 bg-green-50 px-1.5 py-0.5 rounded">当前</span>'
+                    : '<span class="ml-2 text-xs text-gray-400">已归档</span>'}
+                ${v.adjustment_reason ? `<div class="text-xs text-gray-400 truncate mt-0.5" style="max-width:260px;">💡 ${esc(v.adjustment_reason)}</div>` : ''}
+            </div>
+            <div class="flex gap-1 shrink-0">
+                <button onclick="previewPlanVersion(${v.id})" class="btn-outline" style="padding:4px 10px;font-size:12px;">预览</button>
+                ${v.status !== 'active' ? `<button onclick="rollbackPlan(${v.id}, ${v.version})" class="btn-outline" style="padding:4px 10px;font-size:12px;">回退</button>` : ''}
+            </div>
+        </div>`).join('');
+    Utils.showModal({
+        title: '课程规划版本历史',
+        subtitle: `${planList.length} 个版本 · 回退会复制所选版本为新版本`,
+        width: 620,
+        hideOk: true,
+        bodyHtml: html || '<p class="text-gray-400 text-center py-6">暂无版本</p>',
+    });
+}
+
+async function previewPlanVersion(planId) {
+    const v = planList.find(p => p.id === planId);
+    if (!v) { showToast('规划不存在', 'error'); return; }
+    const rows = safeParse(v.plan_json, []);
+    const html = `<div class="text-sm">` + (Array.isArray(rows) ? rows.map(r => `
+        <div class="py-2 border-b" style="border-color:#f1f5f9;">
+            <span class="font-medium">${esc(r.lesson)}</span>
+            <span class="ml-2 text-gray-600">${esc(r.content)}</span>
+            <span class="ml-2 text-xs text-gray-400">${r.hours ?? ''}课时</span>
+            <span class="ml-2 text-xs text-gray-400">${esc(r.teacher_name || '')}</span>
+            <span class="ml-2 text-xs text-gray-400">${esc(r.schedule || '')}</span>
+        </div>`).join('') : '') + `</div>`;
+    Utils.showModal({ title: `规划 v${v.version} 预览`, width: 600, hideOk: true, bodyHtml: html });
+}
+
+function rollbackPlan(planId, version) {
+    const v = planList.find(p => p.id === planId);
+    if (!v) return;
+    Utils.confirmDialog({
+        title: '回退课程规划',
+        message: `将 v${version} 的内容复制为新版本（当前版本保持归档），确认回退？`,
+        onOk: async () => {
+            planBusy = true;
+            try {
+                const r = await API.plans.save(currentSubjectId, {
+                    plan_json: safeParse(v.plan_json, []),
+                    adjustment_reason: `回退到 v${version}`,
+                });
+                if (!r.success) throw new Error(r.error);
+                showToast(`已回退并生成 v${r.data.version}`, 'success');
+                renderPlanTab();
+            } catch (e) { showToast('回退失败：' + e.message, 'error'); }
+            finally { planBusy = false; }
+        },
+    });
 }
 
 /* ---------- 初始化 ---------- */
@@ -323,11 +967,24 @@ if (routeSubjectId) {
 }
 loadSubjects();
 
+/* ---------- 页面卸载钩子（app.js unmounted 调用）：释放 ECharts 实例 + resize 监听 ---------- */
+window.addEventListener('resize', onScoreChartResize);
+window.__pageUnmounted = function () {
+    disposeScoreChart();
+    window.removeEventListener('resize', onScoreChartResize);
+    window.__pageUnmounted = null;
+};
+
 /* ---------- IIFE 作用域导出：供内联 onclick/onchange 调用 ---------- */
 Object.assign(window, {
     changeStudentStatus, deleteStudent, editStudentInfo, toggleSubject,
     generateSubjectReport, refreshStudentDetail, selectSubject,
     showAddSubjectModal, switchSubjectTab,
+    // P6 成绩 Tab
+    showAddScoreModal, showBatchScoreModal, runScoreAnalysis, setScoreChartMode, editScore, deleteScore,
+    // P6 规划 Tab
+    renderPlanTab, addPlanRowTab, deletePlanRowTab, savePlanVersion, assignTeacherAllPlan,
+    showPlanVersions, previewPlanVersion, rollbackPlan, runPlanAdjust,
 });
 })();
 </script>

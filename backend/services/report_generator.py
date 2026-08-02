@@ -260,7 +260,7 @@ def _next_plan_version(db: Session, subject_id: int) -> int:
     return (latest.version + 1) if latest else 1
 
 
-def _create_course_plan(db: Session, subject_id: int, plan_rows: list) -> Optional[CoursePlan]:
+def _create_course_plan(db: Session, subject_id: int, plan_rows: list, adjustment_reason: str = "") -> Optional[CoursePlan]:
     """从 plan 数组创建新规划版本（归档旧 active）；无 plan 行返回 None"""
     if not plan_rows:
         return None
@@ -275,6 +275,7 @@ def _create_course_plan(db: Session, subject_id: int, plan_rows: list) -> Option
         version=_next_plan_version(db, subject_id),
         plan_json=_dump(plan_rows),
         status="active",
+        adjustment_reason=adjustment_reason,
         created_at=now_iso(),
     )
     db.add(plan)

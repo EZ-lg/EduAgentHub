@@ -1,10 +1,11 @@
 """
-课程规划 API（P6 实现完整逻辑）
+课程规划 API（P6：手动保存新版本 + AI 调整建议）
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from backend.models import get_db
 from backend.models.course_plan import CoursePlan
+from backend.services import score_analyzer
 from backend.utils.helpers import success_response, now_iso
 
 router = APIRouter(prefix="/api", tags=["course_plans"])
@@ -21,18 +22,31 @@ def list_plans(subject_id: int, db: Session = Depends(get_db)):
 
 @router.post("/subjects/{subject_id}/plans")
 def create_plan(subject_id: int, data: dict, db: Session = Depends(get_db)):
-    """新建规划"""
-    plan = CoursePlan(
-        subject_id=subject_id,
-        version=data.get("version", 1),
-        plan_json=data.get("plan_json", "[]"),
-        status=data.get("status", "active"),
-        adjustment_reason=data.get("adjustment_reason", ""),
-    )
-    db.add(plan)
-    db.commit()
-    db.refresh(plan)
-    return success_response(plan.to_dict())
+    """新建规划（等价 /plans/save：自动版本号 + 归档旧 active，避免版本纪律旁路）"""
+    plan_rows = data.get("plan_json") or []
+    if not isinstance(plan_rows, list):
+        raise HTTPException(status_code=400, detail="plan_json 必须是数组")
+    plan = score_analyzer.save_plan_version(
+        db, subject_id, plan_rows, str(data.get("adjustment_reason") or "").strip())
+    return success_response(plan)
+
+
+@router.post("/subjects/{subject_id}/plans/save")
+def save_plan(subject_id: int, data: dict, db: Session = Depends(get_db)):
+    """手动保存课程规划为新版本（归档旧 active）：body {plan_json: [...], adjustment_reason: ""}"""
+    plan_rows = data.get("plan_json") or []
+    if not isinstance(plan_rows, list):
+        raise HTTPException(status_code=400, detail="plan_json 必须是数组")
+    plan = score_analyzer.save_plan_version(
+        db, subject_id, plan_rows, str(data.get("adjustment_reason") or "").strip())
+    return success_response(plan)
+
+
+@router.post("/subjects/{subject_id}/plans/adjust")
+def adjust_plan(subject_id: int, db: Session = Depends(get_db)):
+    """AI 课程调整建议（预览不落库）：基于成绩分析返回调整后规划 + 原因"""
+    result = score_analyzer.adjust_plan_preview(db, subject_id)
+    return success_response(result)
 
 
 @router.put("/plans/{plan_id}")
