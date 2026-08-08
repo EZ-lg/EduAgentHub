@@ -84,8 +84,8 @@ window.Utils = {
     /**
      * 通用表单弹窗
      * opts: { title, subtitle, fields, values, onSubmit, width, columns }
-     *   fields: [{ key, label, type: 'text'|'select'|'textarea'|'number'|'password',
-     *              options(select时), required, placeholder, rows, default, section, full }]
+     *   fields: [{ key, label, type: 'text'|'select'|'multi-select'|'textarea'|'number'|'password'|'date',
+     *              options(select/multi-select时), required, placeholder, rows, default, section, full }]
      *   columns: 1 或 2（两列填表式）；字段设 full:true 占整行
      *   onSubmit(result): 点确定后回调，result 为 {key: value}
      */
@@ -123,6 +123,16 @@ window.Utils = {
                     return `<option value="${Utils.escapeHtml(String(ov))}" ${sel}>${Utils.escapeHtml(String(ol))}</option>`;
                 }).join('');
                 input = `<select class="w-full" data-key="${f.key}">${opts}</select>`;
+            } else if (f.type === 'multi-select') {
+                // 多选（checkbox 组），收集结果为字符串数组，适合存 JSON 数组
+                const cur = Array.isArray(val) ? val.map(String) : [];
+                const opts = (f.options || []).map(o => {
+                    const ov = (typeof o === 'object') ? (o.v !== undefined ? o.v : o.value) : o;
+                    const ol = (typeof o === 'object') ? (o.label !== undefined ? o.label : ov) : o;
+                    const checked = cur.includes(String(ov)) ? 'checked' : '';
+                    return `<label class="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer"><input type="checkbox" value="${Utils.escapeHtml(String(ov))}" ${checked}> ${Utils.escapeHtml(String(ol))}</label>`;
+                }).join('');
+                input = `<div class="flex flex-wrap gap-x-4 gap-y-2" data-key="${f.key}">${opts}</div>`;
             } else if (f.type === 'textarea') {
                 input = `<textarea class="w-full" rows="${f.rows || 3}" placeholder="${Utils.escapeHtml(f.placeholder || '')}" data-key="${f.key}">${Utils.escapeHtml(String(val))}</textarea>`;
             } else {
@@ -171,11 +181,17 @@ window.Utils = {
             for (const f of fields) {
                 const el = mask.querySelector(`[data-key="${f.key}"]`);
                 let v = el ? el.value : '';
-                if (f.type === 'number') v = (v === '' || v === null) ? '' : Number(v);
+                if (f.type === 'multi-select') {
+                    v = el ? Array.from(el.querySelectorAll('input[type="checkbox"]:checked')).map(c => c.value) : [];
+                } else if (f.type === 'number') {
+                    v = (v === '' || v === null) ? '' : Number(v);
+                }
                 result[f.key] = v;
             }
             for (const f of fields) {
-                if (f.required && (result[f.key] === '' || result[f.key] === null || result[f.key] === undefined)) {
+                const v = result[f.key];
+                const emptyArr = Array.isArray(v) && v.length === 0;
+                if (f.required && (v === '' || v === null || v === undefined || emptyArr)) {
                     showToast(`请填写「${f.label}」`, 'error');
                     return;
                 }

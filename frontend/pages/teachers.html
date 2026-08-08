@@ -1,9 +1,157 @@
-<!-- 教师管理页 -->
+<!-- 教师管理页 — P7a：教师 CRUD + 擅长科目多选 + 课程规划选教师 -->
 <div class="fade-in">
-    <div class="text-center py-12 text-gray-400">
-        <div class="text-4xl mb-4">👨‍🏫</div>
-        <p class="text-lg mb-2">教师管理</p>
-        <p class="text-sm">此功能将在 P7 阶段完善</p>
-        <p class="text-xs text-gray-300 mt-4">教师 CRUD + 擅长科目多选 + 课程规划选教师</p>
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <h2 class="text-sm font-semibold text-gray-700">教师列表 <span class="text-xs text-gray-400 font-normal" id="teacher-count"></span></h2>
+        <div class="flex gap-2">
+            <input id="teacher-search" type="text" placeholder="🔍 搜索姓名/科目" oninput="searchTeachers(this.value)"
+                   class="text-sm border rounded-lg px-3 py-1.5" style="width:200px; border-color:#e2e8f0;">
+            <button onclick="showAddTeacherModal()" class="btn-primary" style="padding:6px 16px;font-size:13px;">➕ 新增教师</button>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="text-center py-10 text-gray-300" id="teachers-loading">加载中...</div>
+        <table class="w-full text-sm hidden" id="teachers-table">
+            <thead>
+                <tr>
+                    <th style="width:130px;">姓名</th>
+                    <th style="width:280px;">擅长科目</th>
+                    <th style="width:150px;">电话</th>
+                    <th>简介</th>
+                    <th style="width:110px;">操作</th>
+                </tr>
+            </thead>
+            <tbody id="teachers-tbody"></tbody>
+        </table>
+        <div class="text-center py-12 text-gray-400 hidden" id="teachers-empty">
+            <div class="text-4xl mb-3">👨‍🏫</div>
+            <div class="text-sm mb-1">暂无教师</div>
+            <div class="text-xs text-gray-300">点击右上角「➕ 新增教师」添加，课程规划里即可按教师指派课时</div>
+        </div>
     </div>
 </div>
+
+<script>
+(function () {
+/* ---------- 常用学科（擅长科目多选选项，可扩充） ---------- */
+const SUBJECT_OPTIONS = [
+    '语文', '数学', '英语', '物理', '化学', '生物',
+    '政治', '历史', '地理', '科学', '奥数', '编程', '英语口语', '其他',
+];
+
+let teacherList = [];
+let searchKw = '';
+
+function esc(s) { return Utils.escapeHtml(String(s ?? '')); }
+function parseSubjects(str) {
+    try { const a = JSON.parse(str || '[]'); return Array.isArray(a) ? a : []; }
+    catch (e) { return []; }
+}
+
+/* ---------- 列表 ---------- */
+async function loadTeachers() {
+    const box = document.getElementById('teachers-tbody');
+    const table = document.getElementById('teachers-table');
+    const empty = document.getElementById('teachers-empty');
+    const loading = document.getElementById('teachers-loading');
+    try {
+        const r = await API.teachers.list(searchKw);
+        teacherList = (r.success && r.data) ? r.data : [];
+    } catch (e) { teacherList = []; }
+    document.getElementById('teacher-count').textContent = teacherList.length ? `（${teacherList.length} 人）` : '';
+    if (!table) return;
+    loading.classList.add('hidden');
+    if (!teacherList.length) {
+        table.classList.add('hidden');
+        empty.classList.remove('hidden');
+        return;
+    }
+    empty.classList.add('hidden');
+    table.classList.remove('hidden');
+    box.innerHTML = teacherList.map(t => `
+        <tr class="border-b align-top" style="border-color:#f1f5f9;">
+            <td class="py-2.5 font-medium text-gray-800">${esc(t.name)}</td>
+            <td class="py-2.5">
+                ${parseSubjects(t.subjects).map(s => `<span class="inline-block px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-600 mr-1 mb-1">${esc(s)}</span>`).join('') || '<span class="text-gray-300">-</span>'}
+            </td>
+            <td class="py-2.5 text-gray-500">${esc(t.phone) || '-'}</td>
+            <td class="py-2.5 text-gray-500 truncate" style="max-width:300px;">${esc(t.intro) || '-'}</td>
+            <td class="py-2.5">
+                <button onclick="editTeacher(${t.id})" class="text-xs text-gray-400 hover:text-blue-500 mr-2" title="编辑">✏️</button>
+                <button onclick="deleteTeacher(${t.id})" class="text-xs text-gray-300 hover:text-red-500" title="删除">🗑️</button>
+            </td>
+        </tr>`).join('');
+}
+
+/* ---------- 新增 / 编辑弹窗 ---------- */
+function showAddTeacherModal(id) {
+    let values = {};
+    if (id) {
+        const t = teacherList.find(x => x.id === id);
+        if (t) {
+            values = {
+                name: t.name,
+                subjects: parseSubjects(t.subjects),
+                phone: t.phone,
+                intro: t.intro,
+            };
+        }
+    }
+    Utils.showModal({
+        title: id ? '编辑教师' : '新增教师',
+        subtitle: id ? '修改教师资料' : '录入教师资料（课程规划中可按教师指派课时）',
+        width: 560,
+        columns: 2,
+        fields: [
+            { key: 'name', label: '姓名', required: true, placeholder: '教师姓名', section: '基本信息' },
+            { key: 'phone', label: '电话', placeholder: '联系电话', section: '基本信息' },
+            { key: 'subjects', label: '擅长科目', type: 'multi-select', options: SUBJECT_OPTIONS, section: '教学信息', full: true },
+            { key: 'intro', label: '简介', type: 'textarea', rows: 3, placeholder: '教学风格、资历等（选填）', section: '教学信息', full: true },
+        ],
+        values,
+        onSubmit: async (data) => {
+            data.subjects = JSON.stringify(data.subjects || []);
+            try {
+                const r = id
+                    ? await API.teachers.update(id, data)
+                    : await API.teachers.create(data);
+                if (r.success) { showToast(id ? '教师已更新' : '教师已添加', 'success'); loadTeachers(); }
+                else showToast('保存失败：' + (r.error || '未知错误'), 'error');
+            } catch (e) { showToast('保存失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+function editTeacher(id) { showAddTeacherModal(id); }
+
+/* ---------- 删除 ---------- */
+function deleteTeacher(id) {
+    const t = teacherList.find(x => x.id === id);
+    Utils.confirmDialog({
+        title: '删除教师',
+        message: `确定删除教师「${t ? t.name : ''}」？删除后课程规划中已指派的该教师将变为无主（历史数据保留）。`,
+        danger: true,
+        onOk: async () => {
+            try {
+                const r = await API.teachers.delete(id);
+                if (r.success) { showToast('已删除', 'success'); loadTeachers(); }
+                else showToast('删除失败：' + (r.error || '未知错误'), 'error');
+            } catch (e) { showToast('删除失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+/* ---------- 搜索 ---------- */
+function searchTeachers(v) { searchKw = v.trim(); loadTeachers(); }
+
+/* ---------- 注册刷新（顶部「↻ 刷新」/切回标签页自动调用） ---------- */
+window.currentPageRefresh = loadTeachers;
+
+/* ---------- IIFE 作用域导出 ---------- */
+Object.assign(window, {
+    showAddTeacherModal, editTeacher, deleteTeacher, searchTeachers,
+});
+
+loadTeachers();
+})();
+</script>

@@ -100,16 +100,15 @@ function createPageComponent(pageName, title) {
             // 执行页面内联脚本（innerHTML 不会自动执行 <script>）
             executeInlineScripts(this.$el);
 
-            // 加载看门狗：页面卡在"加载中"超过 6 秒则自动重试/刷新，无需用户手动 F5
+            // 加载看门狗：仅当页面脚本压根没执行（加载失败/旧缓存代码）时强制刷新一次兜底。
+            // 不自动刷新"活页面"：若脚本已执行（currentPageRefresh 已注册），页内"加载中"多为
+            // 异步加载的临时状态（隐藏容器占位/Tab 切换瞬态），自动刷新会整页重渲染，
+            // 打断用户正在输入的编辑和滚动位置（曾因此误伤学科详情的课程规划编辑）
             setTimeout(() => {
                 try {
                     if (!this.$el || !this.$el.isConnected) return;
                     if (this.$el.textContent.includes('加载中')) {
-                        if (typeof window.currentPageRefresh === 'function') {
-                            // 脚本已执行但数据没回来 → 重试当前页刷新
-                            window.currentPageRefresh();
-                        } else if (sessionStorage.getItem('ta_wdog') !== '1') {
-                            // 脚本压根没执行（旧缓存代码）→ 强制刷新一次
+                        if (typeof window.currentPageRefresh !== 'function' && sessionStorage.getItem('ta_wdog') !== '1') {
                             sessionStorage.setItem('ta_wdog', '1');
                             location.reload();
                         }

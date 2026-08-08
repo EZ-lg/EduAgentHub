@@ -628,7 +628,10 @@ function renderScoreAnalysis(panel, a) {
         </div>`;
 }
 
+let currentSubjectTab = 'report';   // 记住当前 Tab：刷新/切回窗口时保留，不再自动跳回报告
+
 function switchSubjectTab(tab) {
+    currentSubjectTab = tab;
     document.querySelectorAll('#subject-tabs [data-tab]').forEach(b => {
         const isActive = b.dataset.tab === tab;
         b.className = isActive
@@ -637,6 +640,13 @@ function switchSubjectTab(tab) {
         if (isActive) { b.style.cssText = 'border-color:#e2e8f0; margin-bottom:-1px;'; }
         else b.style.cssText = '';
     });
+    renderSubjectTab(tab);
+}
+
+// Tab 渲染分发：刷新/看门狗/切回窗口时按 currentSubjectTab 重渲染，保持用户所在 Tab
+function renderSubjectTab(tab) {
+    const box = document.getElementById('subject-tab-content');
+    if (!box) return;
     const tabNames = { report: '📄 报告', plan: '📅 课程规划', scores: '📊 成绩', logs: '📝 沟通日志' };
     if (tab === 'report' && currentSubjectId) {
         renderReportTab();
@@ -644,8 +654,10 @@ function switchSubjectTab(tab) {
         renderScoresTab();
     } else if (tab === 'plan' && currentSubjectId) {
         renderPlanTab();
+    } else if (tab === 'logs' && currentSubjectId) {
+        renderLogsTab();
     } else {
-        document.getElementById('subject-tab-content').innerHTML =
+        box.innerHTML =
             `<p class="text-gray-300 text-center py-10">「${tabNames[tab]}」功能将在后续版本实现</p>`;
     }
 }
@@ -662,10 +674,13 @@ let planBusy = false;
 async function renderPlanTab() {
     const box = document.getElementById('subject-tab-content');
     if (!box) return;
+    // 先快照用户未保存的输入，重渲染后恢复（刷新/切回窗口/手动刷新触发时打字不丢）
+    const snap = snapshotPlanInputsTab();
     box.innerHTML = '<p class="text-gray-300 text-center py-10">加载中...</p>';
     await loadPlanData();
     if (!box.isConnected) return;   // 导航走开则放弃渲染
     drawPlanTab();
+    if (snap) restorePlanInputsTab(snap);
 }
 
 async function loadPlanData() {
@@ -682,13 +697,14 @@ async function loadPlanData() {
     if (!Array.isArray(planRows)) planRows = [];
 }
 
-function drawPlanTab() {
+function drawPlanTab(preserveInputs = true) {
     const box = document.getElementById('subject-tab-content');
     if (!box) return;
     // 快照当前输入（含未保存编辑），重渲染后恢复
-    const snap = snapshotPlanInputsTab();
+    // preserveInputs=false：planRows 被程序整体替换（如 AI 调整载入）时不回填旧值，否则旧 DOM 会把新值盖掉
+    const snap = preserveInputs ? snapshotPlanInputsTab() : null;
     box.innerHTML = buildPlanHtml();
-    restorePlanInputsTab(snap);
+    if (snap) restorePlanInputsTab(snap);
 }
 
 function buildPlanHtml() {
@@ -817,11 +833,15 @@ function deletePlanRowTab(i) {
 function assignTeacherAllPlan(tid) {
     const teacher = planTeachers.find(t => t.id == tid);
     const newTid = tid ? parseInt(tid) : null;
+    // 直接更新每行教师下拉值：不重渲染，既不被 drawPlanTab 快照把新值盖回，
+    // 也不会丢用户在内容/课时等字段里的未保存编辑
+    document.querySelectorAll('#plan-tab [data-plan="teacher_id"]').forEach(sel => {
+        sel.value = tid ? String(tid) : '';
+    });
     planRows.forEach(row => {
         row.teacher_id = newTid;
         row.teacher_name = teacher ? teacher.name : '';
     });
-    drawPlanTab();
     showToast(newTid ? `已统一指派教师：${teacher ? teacher.name : ''}` : '已清除教师指派', 'success');
 }
 
@@ -871,7 +891,7 @@ async function runPlanAdjust() {
                 ${r.data.reason ? `<p class="text-sm text-amber-800 mb-1">💡 调整原因：${esc(r.data.reason)}</p>` : ''}
                 <p class="text-xs text-amber-600">请核对下方表格，确认后点「💾 保存为新版本」；不保存则切换离开后丢弃。</p>
             </div>`;
-        drawPlanTab();   // 先重建 DOM，再填充面板（避免被重建重置为 hidden）
+        drawPlanTab(false);   // planRows 已整体替换为 AI 建议，不恢复旧值；先重建 DOM 再填充面板
         const panel = document.getElementById('plan-adjust-panel');
         if (panel) {
             panel.classList.remove('hidden');
@@ -948,13 +968,120 @@ function rollbackPlan(planId, version) {
     });
 }
 
+/* ============================================================
+ * 沟通日志 Tab（P7 F7.2）
+ * ============================================================ */
+let logsList = [];
+
+async function renderLogsTab() {
+    const box = document.getElementById('subject-tab-content');
+    if (!box) return;
+    box.innerHTML = '<p class="text-gray-300 text-center py-10">加载中...</p>';
+    try {
+        const r = await API.commLogs.list(currentSubjectId);
+        logsList = (r.success && r.data) ? r.data : [];
+    } catch (e) { logsList = []; }
+    if (!box.isConnected) return;   // 导航走开则放弃渲染
+    box.innerHTML = buildLogsHtml();
+}
+
+function buildLogsHtml() {
+    const listHtml = logsList.length ? logsList.map(l => `
+        <div class="flex items-start justify-between gap-4 py-3" style="border-bottom:1px solid #f1f5f9;">
+            <div class="flex-1">
+                <div class="flex items-center gap-2 mb-1 flex-wrap">
+                    <span class="inline-block px-2 py-0.5 rounded-full text-xs ${methodCls(l.method)}">${esc(l.method)}</span>
+                    <span class="text-xs text-gray-400">${Utils.formatDate(l.log_time)}${l.log_time && l.log_time.length > 10 ? ' ' + esc(l.log_time.slice(11, 16)) : ''}</span>
+                </div>
+                <div class="text-sm text-gray-700" style="white-space:pre-wrap;">${esc(l.content)}</div>
+            </div>
+            <div class="flex gap-1 flex-shrink-0">
+                <button onclick="editLog(${l.id})" class="text-xs text-gray-400 hover:text-blue-500" title="编辑">✏️</button>
+                <button onclick="deleteLog(${l.id})" class="text-xs text-gray-300 hover:text-red-500" title="删除">🗑️</button>
+            </div>
+        </div>`).join('')
+        : `<div class="text-center py-14 text-gray-400">
+            <div class="text-3xl mb-2">📝</div>
+            <div class="text-sm mb-1">暂无沟通记录</div>
+            <div class="text-xs text-gray-300">与家长/学生沟通后，点右上角「➕ 记录沟通」留痕</div>
+        </div>`;
+    return `
+        <div id="logs-tab">
+            <div class="flex items-center justify-between mb-2">
+                <div class="text-xs text-gray-400">共 ${logsList.length} 条记录，按时间倒序</div>
+                <button onclick="showAddLogModal()" class="btn-primary" style="padding:6px 14px;font-size:13px;">➕ 记录沟通</button>
+            </div>
+            <div>${listHtml}</div>
+        </div>`;
+}
+
+function methodCls(m) {
+    const map = { '电话': 'bg-blue-50 text-blue-600', '微信': 'bg-green-50 text-green-600', '面谈': 'bg-purple-50 text-purple-600' };
+    return map[m] || 'bg-gray-100 text-gray-600';
+}
+
+function showAddLogModal(editId) {
+    let values = {};
+    if (editId) {
+        const l = logsList.find(x => x.id === editId);
+        if (l) {
+            values = {
+                log_time: (l.log_time || '').slice(0, 10),
+                method: l.method,
+                content: l.content,
+            };
+        }
+    } else {
+        values = { log_time: new Date().toISOString().slice(0, 10), method: '面谈' };
+    }
+    Utils.showModal({
+        title: editId ? '编辑沟通记录' : '记录沟通',
+        subtitle: '记录一次与家长/学生的沟通',
+        width: 560,
+        fields: [
+            { key: 'log_time', label: '沟通时间', type: 'date', required: true },
+            { key: 'method', label: '沟通方式', type: 'select', options: [{ v: '面谈', label: '面谈' }, { v: '电话', label: '电话' }, { v: '微信', label: '微信' }, { v: '其他', label: '其他' }] },
+            { key: 'content', label: '内容摘要', type: 'textarea', rows: 4, required: true, placeholder: '沟通要点、家长反馈、学员状态、约定事项...' },
+        ],
+        values,
+        onSubmit: async (data) => {
+            if (!data.log_time) data.log_time = new Date().toISOString().slice(0, 10);
+            try {
+                const r = editId
+                    ? await API.commLogs.update(editId, data)
+                    : await API.commLogs.create(currentSubjectId, data);
+                if (r.success) { showToast(editId ? '记录已更新' : '已记录', 'success'); renderLogsTab(); }
+                else showToast('保存失败：' + (r.error || '未知错误'), 'error');
+            } catch (e) { showToast('保存失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+function editLog(id) { showAddLogModal(id); }
+
+function deleteLog(id) {
+    const l = logsList.find(x => x.id === id);
+    Utils.confirmDialog({
+        title: '删除沟通记录',
+        message: '确定删除这条沟通记录？',
+        danger: true,
+        onOk: async () => {
+            try {
+                const r = await API.commLogs.delete(id);
+                if (r.success) { showToast('已删除', 'success'); renderLogsTab(); }
+                else showToast('删除失败：' + (r.error || '未知错误'), 'error');
+            } catch (e) { showToast('删除失败：' + e.message, 'error'); }
+        },
+    });
+}
+
 /* ---------- 初始化 ---------- */
 function refreshStudentDetail() {
     loadStudentDetail();
     loadSubjects();
     if (currentSubjectId) {
         document.getElementById('subject-detail-area').classList.remove('hidden');
-        renderReportTab();  // P5 起默认展示报告 Tab
+        renderSubjectTab(currentSubjectTab);  // 刷新保留当前 Tab（修 bug：不再自动跳回报告）
     }
 }
 // 注册全局刷新（顶部「↻ 刷新」按钮 / 切回标签页自动调用）
@@ -963,7 +1090,7 @@ window.currentPageRefresh = refreshStudentDetail;
 loadStudentDetail();
 if (routeSubjectId) {
     document.getElementById('subject-detail-area').classList.remove('hidden');
-    renderReportTab();
+    renderSubjectTab('report');  // 首次进入默认报告 Tab
 }
 loadSubjects();
 
@@ -985,6 +1112,8 @@ Object.assign(window, {
     // P6 规划 Tab
     renderPlanTab, addPlanRowTab, deletePlanRowTab, savePlanVersion, assignTeacherAllPlan,
     showPlanVersions, previewPlanVersion, rollbackPlan, runPlanAdjust,
+    // P7 沟通日志 Tab
+    renderLogsTab, showAddLogModal, editLog, deleteLog,
 });
 })();
 </script>
