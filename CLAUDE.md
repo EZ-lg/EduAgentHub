@@ -26,7 +26,7 @@
 | 前端框架 | Vue.js 3 CDN | `vue.global.prod.js`，无需 npm/build |
 | 前端路由 | Vue Router 4 CDN | Hash 模式 `#/xxx`，无需服务端配置 |
 | 图表 | ECharts 5 CDN | 成绩曲线图 |
-| 样式 | Tailwind CSS CDN | 快速开发，也可手写 CSS |
+| 样式 | Tailwind CSS 本地编译 | `build_tailwind.py` 扫描生成 `frontend/vendor/tailwind.css`；离线可用、大陆网络不依赖外网，新增 class 需重跑该脚本 |
 | PDF 导出 | jsPDF + html2canvas (前端) | 浏览器自带中文字体，免折腾 |
 | 打包 | PyInstaller 6 | 单 exe，约 300-800MB |
 
@@ -182,7 +182,8 @@ tutoring-agent/
 - 页面模板通过 `fetch()` 加载 HTML 片段，缓存到内存
 - 全局状态用 `reactive()` + `provide/inject`，不需要 Pinia
 - API 调用统一走 `api.js` 封装的 `fetch`，返回 JSON
-- 样式优先用 Tailwind CDN 的 class，复杂样式写 `style.css`
+- 样式优先用 Tailwind 的 class，复杂样式写 `style.css`
+- **Tailwind 本地编译纪律**：`python build_tailwind.py` 扫描 `frontend/**/*.{html,js}` 生成 `frontend/vendor/tailwind.css`（构建时编译）。**新增 Tailwind class / 新页面后必须重跑**，否则新 class 静默无样式。CLI 装在 `build/tools/`（npm/npmmirror 或 standalone exe），index.html 引用该文件的 `?v=` 需与 APP_VERSION 同步递增
 
 ### 数据
 - 学生 `status`：`active` | `completed` | `abandoned`
@@ -204,7 +205,8 @@ tutoring-agent/
 - 切换 Embedding 需提示重建知识库
 
 ### 打包
-- CDN 资源提前下载到 `frontend/vendor/`
+- CDN 资源提前下载到 `frontend/vendor/`（Vue/Router/ECharts/jsPDF 等）
+- Tailwind 不引 CDN：`python build_tailwind.py` 编译生成 `frontend/vendor/tailwind.css` 本地加载（`build/tools/` 为构建依赖，不打包）
 - 入口 `main.py` 处理 `sys._MEIPASS` 判断是否在 exe 内运行
 - data 目录放在 exe 同级，不打包进 exe
 - 端口从 8888 开始自动寻找可用端口

@@ -7,6 +7,8 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+!build/tailwind-input.css
+!build_tailwind.py
 *.spec
 venv/
 .venv/
