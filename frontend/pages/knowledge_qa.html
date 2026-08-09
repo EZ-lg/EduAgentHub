@@ -5,8 +5,8 @@
             <span class="text-xs text-gray-400 font-normal">AI 基于机构知识库回答 · 历史自动保存</span>
         </h2>
         <div class="flex items-center gap-3">
-            <button onclick="clearHistory()" class="text-xs text-gray-400 hover:text-red-500 transition">🗑️ 清空历史</button>
-            <button onclick="goBack()" class="text-xs text-blue-500 hover:text-blue-700 transition">← 返回知识库</button>
+            <button onclick="clearHistory()" class="text-xs text-gray-400 hover:text-red-500 transition inline-flex items-center gap-1"><svg class="icon icon--sm"><use href="#icon-trash-2"/></svg> 清空历史</button>
+            <button onclick="goBack()" class="text-xs text-indigo-500 hover:text-indigo-700 transition inline-flex items-center gap-1"><svg class="icon icon--sm"><use href="#icon-arrow-left"/></svg> 返回知识库</button>
         </div>
     </div>
 
@@ -18,10 +18,10 @@
 
     <!-- 对话区 -->
     <div id="qa-chat" class="flex-1 overflow-y-auto panel p-4 space-y-3" style="min-height:0;">
-        <div class="text-center py-10 text-gray-300">
-            <div class="text-4xl mb-3">🤖</div>
-            <div class="text-sm">上传知识库文档后，向我提问即可获取基于机构资料的解答</div>
-            <div class="text-xs text-gray-300 mt-2">回答底部会标注引用的知识库文档</div>
+        <div class="empty-state">
+            <div class="empty-icon"><svg class="icon"><use href="#icon-bot"/></svg></div>
+            <div class="empty-title">上传知识库文档后，向我提问即可获取基于机构资料的解答</div>
+            <div class="empty-desc">回答底部会标注引用的知识库文档</div>
         </div>
     </div>
 
@@ -74,10 +74,10 @@ function clearHistory() {
 function renderHistory() {
     const chat = document.getElementById('qa-chat');
     if (!qaHistory.length) {
-        chat.innerHTML = `<div class="text-center py-10 text-gray-300">
-            <div class="text-4xl mb-3">🤖</div>
-            <div class="text-sm">上传知识库文档后，向我提问即可获取基于机构资料的解答</div>
-            <div class="text-xs text-gray-300 mt-2">回答底部会标注引用的知识库文档</div>
+        chat.innerHTML = `<div class="empty-state">
+            <div class="empty-icon"><svg class="icon"><use href="#icon-bot"/></svg></div>
+            <div class="empty-title">上传知识库文档后，向我提问即可获取基于机构资料的解答</div>
+            <div class="empty-desc">回答底部会标注引用的知识库文档</div>
         </div>`;
         return;
     }
@@ -86,23 +86,23 @@ function renderHistory() {
 
 function userBubble(text) {
     return `<div class="flex justify-end">
-        <div class="max-w-[75%] bg-blue-500 text-white text-sm rounded-2xl rounded-br-sm px-4 py-2.5 whitespace-pre-wrap">${esc(text)}</div>
+        <div class="max-w-[75%] bg-indigo-600 text-white text-sm rounded-2xl rounded-br-sm px-4 py-2.5 whitespace-pre-wrap">${esc(text)}</div>
     </div>`;
 }
 
 function aiBubble(m) {
     const refs = (m.references && m.references.length)
         ? `<div class="mt-2.5 pt-2 border-t" style="border-color:#f1f5f9;">
-            <div class="text-xs text-gray-400 mb-1">📚 引用来源</div>
+            <div class="text-xs text-gray-400 mb-1.5 inline-flex items-center gap-1"><svg class="icon icon--sm"><use href="#icon-quote"/></svg> 引用来源</div>
             <div class="flex flex-wrap gap-1.5">
-                ${m.references.map(r => `<span class="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600" title="${esc(r.snippet || '')}">《${esc(r.title)}》</span>`).join('')}
+                ${m.references.map(r => `<span class="badge badge--info" title="${esc(r.snippet || '')}">《${esc(r.title)}》</span>`).join('')}
             </div>
           </div>`
         : '';
     return `<div class="flex justify-start">
         <div class="max-w-[80%] bg-white border text-sm text-gray-700 rounded-2xl rounded-bl-sm px-4 py-2.5" style="border-color:#f1f5f9;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
             <div class="whitespace-pre-wrap leading-relaxed">${esc(m.content)}</div>
-            ${m.error ? `<div class="mt-1 text-xs text-red-500">⚠️ ${esc(m.error)}</div>` : ''}
+            ${m.error ? `<div class="mt-1 text-xs text-red-500 inline-flex items-center gap-1"><svg class="icon icon--sm"><use href="#icon-alert-triangle"/></svg> ${esc(m.error)}</div>` : ''}
             ${refs}
         </div>
     </div>`;
@@ -111,7 +111,7 @@ function aiBubble(m) {
 function aiLoadingBubble() {
     return `<div class="flex justify-start" id="qa-loading">
         <div class="bg-white border text-sm text-gray-400 rounded-2xl rounded-bl-sm px-4 py-3" style="border-color:#f1f5f9;">
-            <span class="inline-flex items-center gap-1.5">🤖 <span class="qa-dots">思考中</span></span>
+            <span class="inline-flex items-center gap-1.5"><svg class="icon icon--md"><use href="#icon-bot"/></svg> <span class="qa-dots">思考中</span></span>
         </div>
     </div>`;
 }

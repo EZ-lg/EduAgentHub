@@ -2,9 +2,9 @@
 <div class="fade-in">
     <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div class="flex items-center gap-3">
-            <h2 class="text-sm font-semibold text-gray-700">知识库文档 <span class="text-xs text-gray-400 font-normal" id="kb-count"></span></h2>
-            <button onclick="goToQA()" class="text-xs text-blue-500 hover:text-blue-700 transition" title="基于知识库智能问答">
-                🤖 智能问答 →
+            <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5"><svg class="icon icon--md text-indigo-500"><use href="#icon-book-open"/></svg> 知识库文档 <span class="text-xs text-gray-400 font-normal" id="kb-count"></span></h2>
+            <button onclick="goToQA()" class="text-xs text-indigo-500 hover:text-indigo-700 transition inline-flex items-center gap-1" title="基于知识库智能问答">
+                <svg class="icon icon--sm"><use href="#icon-bot"/></svg> 智能问答 <svg class="icon icon--sm"><use href="#icon-chevron-right"/></svg>
             </button>
         </div>
         <div class="flex gap-2 items-center">
@@ -19,9 +19,9 @@
                 <option value="政策">政策</option>
                 <option value="其他">其他</option>
             </select>
-            <button onclick="openSearchModal()" class="btn-outline" style="padding:6px 16px;font-size:13px;">🔍 检索测试</button>
-            <button onclick="openUploadModal()" class="btn-primary" style="padding:6px 16px;font-size:13px;">➕ 上传文档</button>
-            <button onclick="rebuildKb()" class="text-xs text-gray-400 hover:text-blue-500 transition" title="清空全部向量，按现有已启用文档重新入库（切换 Embedding 模型后使用）">↻ 重建</button>
+            <button onclick="openSearchModal()" class="btn-outline" style="padding:6px 16px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-search"/></svg> 检索测试</button>
+            <button onclick="openUploadModal()" class="btn-primary" style="padding:6px 16px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-plus"/></svg> 上传文档</button>
+            <button onclick="rebuildKb()" class="text-xs text-gray-400 hover:text-indigo-500 transition inline-flex items-center gap-1" title="清空全部向量，按现有已启用文档重新入库（切换 Embedding 模型后使用）"><svg class="icon icon--sm"><use href="#icon-refresh-cw"/></svg> 重建</button>
         </div>
     </div>
 
@@ -43,10 +43,12 @@
             </thead>
             <tbody id="kb-tbody"></tbody>
         </table>
-        <div class="text-center py-12 text-gray-400 hidden" id="kb-empty">
-            <div class="text-4xl mb-3">📚</div>
-            <div class="text-sm mb-1">知识库暂无文档</div>
-            <div class="text-xs text-gray-300">点击右上角「➕ 上传文档」上传 PDF / Word / TXT / Markdown，自动切片入库，供报告生成与智能问答引用</div>
+        <div class="hidden" id="kb-empty">
+            <div class="empty-state">
+                <div class="empty-icon"><svg class="icon"><use href="#icon-book-open"/></svg></div>
+                <div class="empty-title">知识库暂无文档</div>
+                <div class="empty-desc">点击右上角「上传文档」上传 PDF / Word / TXT / Markdown，自动切片入库，供报告生成与智能问答引用</div>
+            </div>
         </div>
     </div>
 </div>
@@ -67,7 +69,7 @@ function checkEmbedReady() {
     if (docList.length === 0) {
         const box = document.getElementById('kb-embed-warning');
         box.classList.remove('hidden');
-        box.innerHTML = '💡 知识库入库需要「Embedding 向量模型」支持（DeepSeek 不提供向量接口）。请先在 <a href="#/settings" class="underline">系统设置 → Embedding</a> 中配置支持向量化的提供商（如 OpenAI / 通义千问 / 其他 OpenAI 兼容接口），再上传文档。';
+        box.innerHTML = '<svg class="icon icon--sm inline mr-1 align-middle"><use href="#icon-lightbulb"/></svg> 知识库入库需要「Embedding 向量模型」支持（DeepSeek 不提供向量接口）。请先在 <a href="#/settings" class="underline">系统设置 → Embedding</a> 中配置支持向量化的提供商（如 OpenAI / 通义千问 / 其他 OpenAI 兼容接口），再上传文档。';
     }
 }
 
@@ -98,15 +100,15 @@ async function loadDocs() {
             <td class="py-2.5">
                 <div class="font-medium text-gray-800 truncate" style="max-width:200px;" title="${esc(d.title)}">${esc(d.title)}</div>
             </td>
-            <td class="py-2.5"><span class="inline-block px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">${esc(d.category || '其他')}</span></td>
+            <td class="py-2.5"><span class="badge badge--neutral">${esc(d.category || '其他')}</span></td>
             <td class="py-2.5 text-gray-500 text-xs">${ext}</td>
-            <td class="py-2.5 text-gray-500">${d.chunk_count}</td>
+            <td class="py-2.5 text-gray-500 num">${d.chunk_count}</td>
             <td class="py-2.5">${statusCell(d)}</td>
             <td class="py-2.5 text-gray-400 text-xs">${fmtDate(d.created_at)}</td>
             <td class="py-2.5">
-                <button onclick="previewDoc(${d.id})" class="text-xs text-gray-400 hover:text-blue-500 mr-2" title="预览文本">👁️</button>
-                <button onclick="reparseDoc(${d.id})" class="text-xs text-gray-400 hover:text-blue-500 mr-2" title="重新解析">🔄</button>
-                <button onclick="deleteDoc(${d.id})" class="text-xs text-gray-300 hover:text-red-500" title="删除">🗑️</button>
+                <button onclick="previewDoc(${d.id})" class="icon-btn mr-1" title="预览文本"><svg class="icon"><use href="#icon-eye"/></svg></button>
+                <button onclick="reparseDoc(${d.id})" class="icon-btn mr-1" title="重新解析"><svg class="icon"><use href="#icon-rotate-cw"/></svg></button>
+                <button onclick="deleteDoc(${d.id})" class="icon-btn icon-btn--danger" title="删除"><svg class="icon"><use href="#icon-trash-2"/></svg></button>
             </td>
         </tr>`;
     }).join('');
@@ -118,17 +120,15 @@ async function loadDocs() {
 function statusCell(d) {
     const st = d.index_status || 'done';
     if (st === 'pending' || st === 'processing') {
-        return `<span class="text-xs px-2 py-1 rounded-full" style="background:#eff6ff;color:#1d4ed8;">⏳ 入库中…</span>`;
+        return `<span class="badge badge--info"><svg class="icon icon--sm icon-spin"><use href="#icon-loader"/></svg> 入库中…</span>`;
     }
     if (st === 'error') {
         const msg = (d.index_error || '入库失败').slice(0, 24);
-        return `<span class="text-xs px-2 py-1 rounded-full cursor-pointer" style="background:#fee2e2;color:#b91c1c;"
-            title="${esc(d.index_error || '入库失败')}" onclick="reparseDoc(${d.id})">⚠️ 失败 ${esc(msg)}</span>`;
+        return `<span class="badge badge--danger cursor-pointer" title="${esc(d.index_error || '入库失败')}" onclick="reparseDoc(${d.id})"><svg class="icon icon--sm"><use href="#icon-alert-triangle"/></svg> 失败 ${esc(msg)}</span>`;
     }
     const active = d.status === 'active';
-    return `<button onclick="toggleDocStatus(${d.id})" class="text-xs px-2 py-1 rounded-full transition"
-        style="${active ? 'background:#dcfce7;color:#15803d;' : 'background:#f1f5f9;color:#64748b;'}">
-        ${active ? '✓ 启用' : '已停用'}
+    return `<button onclick="toggleDocStatus(${d.id})" class="${active ? 'badge badge--success' : 'badge badge--neutral'} cursor-pointer transition">
+        ${active ? '<svg class="icon icon--sm"><use href="#icon-check"/></svg> 启用' : '已停用'}
     </button>`;
 }
 
@@ -142,23 +142,24 @@ function openUploadModal() {
     document.querySelector('.ta-modal-mask')?.remove();
     const mask = document.createElement('div');
     mask.className = 'ta-modal-mask';
-    Object.assign(mask.style, { position: 'fixed', inset: '0', background: 'rgba(15,23,42,0.35)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '12vh' });
+    mask.style.paddingTop = '12vh';
     const panel = document.createElement('div');
-    Object.assign(panel.style, { background: '#fff', borderRadius: '12px', width: '560px', maxWidth: '92vw', boxShadow: '0 20px 50px rgba(0,0,0,0.15)', overflow: 'hidden', animation: 'fadeIn 0.15s ease-out' });
+    panel.className = 'ta-modal-panel';
+    panel.style.width = '560px';
 
     const dropId = 'kb-dropzone';
     panel.innerHTML = `
-        <div class="flex items-center justify-between px-5 py-3 border-b" style="border-color:#f1f5f9;">
+        <div class="ta-modal-head">
             <div>
                 <div class="font-semibold text-gray-800 text-sm">上传文档</div>
                 <div class="text-xs text-gray-400 mt-0.5">自动解析 → 切片 → 向量化 → 入库，供报告生成与智能问答引用</div>
             </div>
-            <button class="text-gray-300 hover:text-gray-500 text-lg leading-none" data-close>×</button>
+            <button class="text-gray-300 hover:text-gray-500 text-lg leading-none" data-close><svg class="icon icon--sm"><use href="#icon-x"/></svg></button>
         </div>
-        <div class="px-5 py-4 max-h-[65vh] overflow-y-auto">
+        <div class="ta-modal-body">
             <div id="${dropId}" class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition"
                  style="border-color:#cbd5e1;background:#f8fafc;">
-                <div class="text-3xl mb-2">📄</div>
+                <div style="width:44px;height:44px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:#eef2ff;color:#4f46e5;"><svg class="icon icon--lg"><use href="#icon-upload-cloud"/></svg></div>
                 <div class="text-sm text-gray-500" id="kb-drop-text">点击选择文件，或拖拽到此处</div>
                 <div class="text-xs text-gray-300 mt-1.5">支持 PDF / Word / TXT / Markdown，≤50MB</div>
             </div>
@@ -181,12 +182,12 @@ function openUploadModal() {
                 </div>
                 <label class="col-span-2 flex items-center gap-2 text-sm text-gray-600 cursor-pointer pt-1">
                     <input id="kb-upload-auto" type="checkbox">
-                    🤖 AI 自动分类 <span class="text-xs text-gray-400">（根据文档内容判断所属分类，无需手动选择）</span>
+                    <svg class="icon icon--md text-indigo-500"><use href="#icon-bot"/></svg> AI 自动分类 <span class="text-xs text-gray-400">（根据文档内容判断所属分类，无需手动选择）</span>
                 </label>
             </div>
             <div id="kb-upload-error" class="hidden mt-3 p-2.5 rounded-lg text-xs bg-red-50" style="color:#b91c1c;"></div>
         </div>
-        <div class="flex justify-end gap-2 px-5 py-3 border-t" style="border-color:#f1f5f9;">
+        <div class="ta-modal-foot">
             <button class="btn-outline" data-close style="padding:7px 18px;">取消</button>
             <button class="btn-primary" data-ok style="padding:7px 18px;">上传并入库</button>
         </div>`;
@@ -205,7 +206,7 @@ function openUploadModal() {
     fileInput.style.display = 'none';
     panel.appendChild(fileInput);
     dz.addEventListener('click', () => fileInput.click());
-    dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.style.borderColor = '#3b82f6'; dz.style.background = '#eff6ff'; });
+    dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.style.borderColor = '#4f46e5'; dz.style.background = '#eef2ff'; });
     dz.addEventListener('dragleave', () => { dz.style.borderColor = '#cbd5e1'; dz.style.background = '#f8fafc'; });
     dz.addEventListener('drop', (e) => {
         e.preventDefault();
@@ -228,7 +229,7 @@ function openUploadModal() {
 function setUploadFile(file, dropId) {
     uploadFile = file;
     const text = document.getElementById('kb-drop-text');
-    if (text) text.textContent = '📎 ' + file.name + '（' + (file.size / 1024).toFixed(0) + ' KB）';
+    if (text) text.innerHTML = '<svg class="icon icon--sm inline mr-1 align-middle"><use href="#icon-paperclip"/></svg>' + esc(file.name) + '（' + (file.size / 1024).toFixed(0) + ' KB）';
     const err = document.getElementById('kb-upload-error');
     if (err) { err.classList.add('hidden'); }
 }
@@ -357,7 +358,7 @@ function openSearchModal() {
     if (box) {
         const btn = document.createElement('button');
         btn.className = 'btn-primary';
-        btn.textContent = '🔍 检索';
+        btn.innerHTML = '<svg class="icon icon--md"><use href="#icon-search"/></svg> 检索';
         btn.style.cssText = 'padding:7px 20px;font-size:13px;';
         btn.addEventListener('click', doSearch);
         box.parentElement.appendChild(btn);
@@ -381,7 +382,7 @@ async function doSearch() {
         box.innerHTML = results.map((it, i) => `
             <div class="mb-2.5 p-2.5 rounded-lg border" style="border-color:#e2e8f0;background:#f8fafc;">
                 <div class="flex items-center gap-2 mb-1">
-                    <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background:#eff6ff;color:#1d4ed8;">#${i + 1}</span>
+                    <span class="badge badge--info">#${i + 1}</span>
                     <span class="font-medium text-gray-700">${esc(it.title)}</span>
                     <span class="text-gray-300">·</span>
                     <span class="text-gray-400">${esc(it.category)}</span>

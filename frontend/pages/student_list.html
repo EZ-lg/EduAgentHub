@@ -12,8 +12,8 @@
             </select>
         </div>
         <div class="flex gap-2">
-            <button onclick="loadStudents()" class="btn-outline" title="刷新列表">↻ 刷新</button>
-            <button onclick="showCreateStudentModal()" class="btn-primary">➕ 新建学生</button>
+            <button onclick="loadStudents()" class="btn-outline" title="刷新列表"><svg class="icon icon--md"><use href="#icon-refresh-cw"/></svg> 刷新</button>
+            <button onclick="showCreateStudentModal()" class="btn-primary"><svg class="icon icon--md"><use href="#icon-plus"/></svg> 新建学生</button>
         </div>
     </div>
 
@@ -83,19 +83,19 @@ function renderTable(items) {
         const st = Utils.statusLabel(s.status);
         const sc = s.active_subjects || 0;
         const subjectBadge = sc > 0
-            ? `<span class="px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-600">${sc} 科</span>`
+            ? `<span class="badge badge--info">${sc} 科</span>`
             : '<span class="text-gray-300">0</span>';
         return `<tr class="cursor-pointer" onclick="location.hash='#/student/${s.id}'">
             <td class="px-4 py-3 font-medium text-gray-800">${Utils.escapeHtml(s.name)}</td>
             <td class="px-4 py-3 text-gray-600">${Utils.escapeHtml(s.grade)}</td>
             <td class="px-4 py-3 text-gray-500">${Utils.escapeHtml(s.school)}</td>
-            <td class="px-4 py-3 text-gray-500">${Utils.escapeHtml(s.phone)}</td>
+            <td class="px-4 py-3 text-gray-500 num">${Utils.escapeHtml(s.phone)}</td>
             <td class="px-4 py-3">${subjectBadge}</td>
-            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-full text-xs ${st.cls}">${st.text}</span></td>
+            <td class="px-4 py-3"><span class="${st.cls}">${st.text}</span></td>
             <td class="px-4 py-3 text-gray-300 text-xs">${Utils.formatDate(s.updated_at)}</td>
             <td class="px-4 py-3 text-right">
-                <button onclick="event.stopPropagation();editStudent(${s.id})" class="text-blue-500 hover:text-blue-700 mr-2" title="编辑">✏️</button>
-                <button onclick="event.stopPropagation();deleteStudentConfirm(${s.id})" class="text-gray-300 hover:text-red-500" title="删除">🗑️</button>
+                <button onclick="event.stopPropagation();editStudent(${s.id})" class="icon-btn mr-1" title="编辑"><svg class="icon"><use href="#icon-pencil"/></svg></button>
+                <button onclick="event.stopPropagation();deleteStudentConfirm(${s.id})" class="icon-btn icon-btn--danger" title="删除"><svg class="icon"><use href="#icon-trash-2"/></svg></button>
             </td>
         </tr>`;
     }).join('');
@@ -104,10 +104,10 @@ function renderTable(items) {
 function renderPagination() {
     const totalPages = Math.ceil(studentTotal / 15);
     document.getElementById('student-pagination').innerHTML = totalPages > 1
-        ? `<span>共 ${studentTotal} 条 · ${studentPage}/${totalPages}</span>
+        ? `<span class="num">共 ${studentTotal} 条 · ${studentPage}/${totalPages}</span>
            <div class="flex gap-1">
-               <button onclick="changePage(-1)" class="px-2 py-1 border rounded text-xs hover:border-gray-400" ${studentPage<=1?'disabled':''}>‹ 上一页</button>
-               <button onclick="changePage(1)" class="px-2 py-1 border rounded text-xs hover:border-gray-400" ${studentPage>=totalPages?'disabled':''}>下一页 ›</button>
+               <button onclick="changePage(-1)" class="px-2 py-1 border rounded text-xs inline-flex items-center gap-1 hover:border-gray-400" ${studentPage<=1?'disabled':''}><svg class="icon icon--sm"><use href="#icon-chevron-left"/></svg> 上一页</button>
+               <button onclick="changePage(1)" class="px-2 py-1 border rounded text-xs inline-flex items-center gap-1 hover:border-gray-400" ${studentPage>=totalPages?'disabled':''}>下一页 <svg class="icon icon--sm"><use href="#icon-chevron-right"/></svg></button>
            </div>`
         : `<span>共 ${studentTotal} 条</span>`;
 }

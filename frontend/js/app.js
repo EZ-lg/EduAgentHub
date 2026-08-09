@@ -192,12 +192,13 @@ router.afterEach((to) => {
 // ============================================================
 const ToastComponent = {
     template: `
-        <div class="fixed top-4 right-4 z-50 space-y-2">
+        <div class="toast-container">
             <div v-for="t in store.toasts" :key="t.id"
-                 :class="['px-4 py-3 rounded-lg shadow-lg text-sm text-white fade-in',
-                          t.type === 'success' ? 'bg-green-500' :
-                          t.type === 'error' ? 'bg-red-500' : 'bg-blue-500']">
-                {{ t.message }}
+                 :class="['toast', 'fade-in',
+                          t.type === 'success' ? 'toast--success' :
+                          t.type === 'error' ? 'toast--error' : 'toast--info']">
+                <svg class="icon"><use :href="t.type === 'success' ? '#icon-check-circle' : t.type === 'error' ? '#icon-x-circle' : '#icon-info-circle'"/></svg>
+                <span>{{ t.message }}</span>
             </div>
         </div>
     `,
@@ -214,6 +215,16 @@ const app = createApp({
         return { store };
     },
     async mounted() {
+        // 注入 SVG 图标雪碧图（商用视觉重构：icons.html 定义全部 <symbol>）
+        try {
+            const ivec = await fetch('/components/icons.html?v=' + (window.APP_VERSION || ''));
+            if (ivec.ok) {
+                const itxt = await ivec.text();
+                document.body.insertAdjacentHTML('afterbegin', itxt);
+            }
+        } catch (err) {
+            console.error('Icons load error:', err);
+        }
         // 加载侧边栏
         try {
             const resp = await fetch('/components/navbar.html');

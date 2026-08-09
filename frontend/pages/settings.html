@@ -2,10 +2,10 @@
 <div class="fade-in">
     <!-- Tab 导航 -->
     <div class="flex gap-1 mb-5 border-b" style="border-color:#f1f5f9;">
-        <button class="settings-tab active" data-tab="ai" onclick="switchSettingsTab('ai')">🤖 AI 配置</button>
-        <button class="settings-tab" data-tab="org" onclick="switchSettingsTab('org')">🏢 机构信息</button>
-        <button class="settings-tab" data-tab="data" onclick="switchSettingsTab('data')">💾 数据管理</button>
-        <button class="settings-tab" data-tab="about" onclick="switchSettingsTab('about')">ℹ️ 关于</button>
+        <button class="settings-tab active" data-tab="ai" onclick="switchSettingsTab('ai')"><svg class="icon"><use href="#icon-bot"/></svg> AI 配置</button>
+        <button class="settings-tab" data-tab="org" onclick="switchSettingsTab('org')"><svg class="icon"><use href="#icon-building"/></svg> 机构信息</button>
+        <button class="settings-tab" data-tab="data" onclick="switchSettingsTab('data')"><svg class="icon"><use href="#icon-database"/></svg> 数据管理</button>
+        <button class="settings-tab" data-tab="about" onclick="switchSettingsTab('about')"><svg class="icon"><use href="#icon-info-circle"/></svg> 关于</button>
     </div>
 
     <!-- ============ AI 配置 ============ -->
@@ -15,7 +15,7 @@
 
             <!-- LLM 配置 -->
             <div class="panel">
-                <div class="panel-title">🧠 大模型配置 <span class="text-xs font-normal text-gray-400">(LLM · 对话/生成)</span></div>
+                <div class="panel-title"><svg class="icon"><use href="#icon-brain"/></svg> 大模型配置 <span class="text-xs font-normal text-gray-400">(LLM · 对话/生成)</span></div>
                 <div class="space-y-4">
                     <div>
                         <label class="settings-label">提供商</label>
@@ -52,8 +52,8 @@
                         </div>
                     </div>
                     <div class="flex gap-2">
-                        <button class="btn-outline" onclick="testLLM()">🔌 测试连接</button>
-                        <button class="btn-primary" onclick="saveLLM()">💾 保存配置</button>
+                        <button class="btn-outline" onclick="testLLM()"><svg class="icon icon--md"><use href="#icon-plug"/></svg> 测试连接</button>
+                        <button class="btn-primary" onclick="saveLLM()"><svg class="icon icon--md"><use href="#icon-save"/></svg> 保存配置</button>
                     </div>
                     <div class="text-xs text-gray-300">测试使用当前表单配置，无需先保存</div>
                     <div id="llm-test-result" class="text-sm"></div>
@@ -62,7 +62,7 @@
 
             <!-- Embedding 配置 -->
             <div class="panel">
-                <div class="panel-title">🔤 向量模型配置 <span class="text-xs font-normal text-gray-400">(Embedding · 知识库检索)</span></div>
+                <div class="panel-title"><svg class="icon"><use href="#icon-type"/></svg> 向量模型配置 <span class="text-xs font-normal text-gray-400">(Embedding · 知识库检索)</span></div>
                 <div class="space-y-4">
                     <div>
                         <label class="settings-label">提供商</label>
@@ -87,10 +87,10 @@
                         <datalist id="emb-models"></datalist>
                     </div>
                     <div class="flex gap-2">
-                        <button class="btn-outline" onclick="testEmbed()">🔌 测试连接</button>
-                        <button class="btn-primary" onclick="saveEmbed()">💾 保存配置</button>
+                        <button class="btn-outline" onclick="testEmbed()"><svg class="icon icon--md"><use href="#icon-plug"/></svg> 测试连接</button>
+                        <button class="btn-primary" onclick="saveEmbed()"><svg class="icon icon--md"><use href="#icon-save"/></svg> 保存配置</button>
                     </div>
-                    <div class="text-xs text-amber-500/80">⚠️ 切换 Embedding 模型后，需在「知识库」重新入库向量（P8 实现）</div>
+                    <div class="text-xs text-amber-500/80 inline-flex items-center gap-1"><svg class="icon icon--sm"><use href="#icon-alert-triangle"/></svg> 切换 Embedding 模型后，需在「知识库」重新入库向量（P8 实现）</div>
                     <div id="emb-test-result" class="text-sm"></div>
                 </div>
             </div>
@@ -101,7 +101,7 @@
     <div id="settings-tab-org" class="settings-tab-panel hidden">
         <div class="grid grid-cols-2 gap-4 items-start">
             <div class="panel">
-                <div class="panel-title">🏢 机构信息 <span class="text-xs font-normal text-gray-400">(用于侧边栏与报告 PDF 抬头)</span></div>
+                <div class="panel-title"><svg class="icon"><use href="#icon-building"/></svg> 机构信息 <span class="text-xs font-normal text-gray-400">(用于侧边栏与报告 PDF 抬头)</span></div>
                 <div class="space-y-4">
                     <div>
                         <label class="settings-label">机构名称</label>
@@ -116,7 +116,7 @@
                         <input type="text" id="org-phone" class="w-full" placeholder="如：010-88888888">
                     </div>
                     <div class="pt-2 border-t" style="border-color:#f1f5f9;">
-                        <div class="settings-label">📅 课程默认（用于报告/规划生成）</div>
+                        <div class="settings-label inline-flex items-center gap-1"><svg class="icon icon--sm"><use href="#icon-calendar"/></svg> 课程默认（用于报告/规划生成）</div>
                     </div>
                     <div class="grid grid-cols-3 gap-3">
                         <div>
@@ -145,7 +145,7 @@
                         <div class="flex items-center gap-3">
                             <img id="org-logo-preview" class="hidden w-12 h-12 rounded object-contain" style="border:1px solid #f1f5f9;" alt="logo">
                             <label class="btn-outline cursor-pointer" style="padding:6px 14px;font-size:13px;">
-                                📎 选择图片
+                                <svg class="icon icon--md"><use href="#icon-paperclip"/></svg> 选择图片
                                 <input type="file" id="org-logo-input" accept="image/*" class="hidden" onchange="handleOrgLogo(this)">
                             </label>
                             <button type="button" onclick="clearOrgLogo()" class="text-xs text-gray-400 hover:text-red-500">移除</button>
@@ -153,14 +153,14 @@
                         <div class="text-xs text-gray-300 mt-1.5">建议 ≤200KB，PNG/JPG，用于报告 PDF 抬头显示</div>
                     </div>
                     <div class="flex gap-2 pt-1">
-                        <button class="btn-primary" onclick="saveOrg()">💾 保存机构信息</button>
+                        <button class="btn-primary" onclick="saveOrg()"><svg class="icon icon--md"><use href="#icon-save"/></svg> 保存机构信息</button>
                     </div>
                 </div>
             </div>
             <div class="panel">
-                <div class="panel-title">👁️ 预览</div>
-                <div class="rounded-lg text-center px-6 py-5" style="border:3px solid #2563eb;background:#fff;">
-                    <div class="text-xl font-bold" style="color:#2563eb;" id="org-preview-name">机构名称</div>
+                <div class="panel-title"><svg class="icon"><use href="#icon-eye"/></svg> 预览</div>
+                <div class="rounded-lg text-center px-6 py-5" style="border:3px solid #4f46e5;background:#fff;">
+                    <div class="text-xl font-bold" style="color:#4f46e5;" id="org-preview-name">机构名称</div>
                     <div class="text-xs text-gray-400 mt-1" id="org-preview-meta"></div>
                 </div>
                 <div class="text-xs text-gray-300 mt-3 leading-relaxed">
@@ -173,11 +173,11 @@
     <!-- ============ 数据管理 ============ -->
     <div id="settings-tab-data" class="settings-tab-panel hidden">
         <div class="panel">
-            <div class="panel-title">💾 数据管理</div>
-            <div class="text-center py-10 text-gray-300">
-                <div class="text-2xl mb-2">🗄️</div>
-                <p>此模块将在后续阶段实现</p>
-                <p class="text-xs text-gray-300 mt-2">备份数据库 / 恢复数据库 / 清空数据</p>
+            <div class="panel-title"><svg class="icon"><use href="#icon-database"/></svg> 数据管理</div>
+            <div class="empty-state py-6">
+                <div class="empty-icon"><svg class="icon"><use href="#icon-database"/></svg></div>
+                <div class="empty-title">此模块将在后续阶段实现</div>
+                <div class="empty-desc">备份数据库 / 恢复数据库 / 清空数据</div>
             </div>
         </div>
     </div>
@@ -185,9 +185,9 @@
     <!-- ============ 关于 ============ -->
     <div id="settings-tab-about" class="settings-tab-panel hidden">
         <div class="panel">
-            <div class="panel-title">ℹ️ 关于</div>
+            <div class="panel-title"><svg class="icon"><use href="#icon-info-circle"/></svg> 关于</div>
             <div class="text-center py-8">
-                <div class="text-3xl mb-2">📚</div>
+                <div class="empty-icon mx-auto mb-3"><svg class="icon"><use href="#icon-book-open"/></svg></div>
                 <div class="text-lg font-bold text-gray-800">教培智能体</div>
                 <div class="text-xs text-gray-400 mt-1">v1.0.0 · P9 全功能版</div>
                 <div class="text-xs text-gray-300 mt-4 leading-relaxed">
@@ -216,7 +216,7 @@ function showPageError(msg) {
     const box = document.getElementById('page-error');
     if (box) {
         box.classList.remove('hidden');
-        box.innerHTML = '⚠️ ' + (msg || '未知错误') +
+        box.innerHTML = '<svg class="icon icon--sm inline mr-1 align-middle"><use href="#icon-alert-triangle"/></svg>' + (msg || '未知错误') +
             '<button type="button" class="ml-2 text-xs underline" onclick="this.parentElement.classList.add(\'hidden\')">关闭</button>';
     }
 }
@@ -359,16 +359,16 @@ function renderTestResult(box, res) {
     if (!box) return;
     if (res.pending) {
         box.className = 'text-sm text-gray-400';
-        box.innerHTML = '⏳ ' + (res.message || '测试中...');
+        box.innerHTML = '<svg class="icon icon--sm icon-spin inline mr-1 align-middle"><use href="#icon-loader"/></svg>' + (res.message || '测试中...');
         return;
     }
     const ms = res.latency_ms ? ` · ${res.latency_ms}ms` : '';
     if (res.ok) {
         box.className = 'text-sm text-green-600';
-        box.innerHTML = `✅ ${res.message || '连接成功'}${ms}`;
+        box.innerHTML = `<svg class="icon icon--sm inline mr-1 align-middle"><use href="#icon-check-circle"/></svg> ${res.message || '连接成功'}${ms}`;
     } else {
         box.className = 'text-sm text-red-500';
-        box.innerHTML = `❌ ${res.message || '连接失败'}${ms}`;
+        box.innerHTML = `<svg class="icon icon--sm inline mr-1 align-middle"><use href="#icon-x-circle"/></svg> ${res.message || '连接失败'}${ms}`;
     }
 }
 

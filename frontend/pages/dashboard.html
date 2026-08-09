@@ -1,66 +1,84 @@
 <!-- 工作台看板 — P9：统计卡片 + 趋势图表 + 学科分布 + 学生看板 + 最近活动 -->
 <div class="fade-in">
     <!-- 统计卡片 -->
-    <div class="grid grid-cols-6 gap-4 mb-6" style="min-width:0;">
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6" style="min-width:0;">
         <div class="stat-card">
-            <div class="stat-value" id="stat-active-students">0</div>
-            <div class="stat-label"><span class="stat-dot stat-dot-blue"></span>在读学生</div>
+            <div class="stat-icon stat-icon--blue"><svg class="icon"><use href="#icon-users"/></svg></div>
+            <div>
+                <div class="stat-value num" id="stat-active-students">0</div>
+                <div class="stat-label">在读学生</div>
+            </div>
         </div>
         <div class="stat-card">
-            <div class="stat-value" id="stat-active-subjects">0</div>
-            <div class="stat-label"><span class="stat-dot stat-dot-purple"></span>活跃学科</div>
+            <div class="stat-icon stat-icon--violet"><svg class="icon"><use href="#icon-book-open"/></svg></div>
+            <div>
+                <div class="stat-value num" id="stat-active-subjects">0</div>
+                <div class="stat-label">活跃学科</div>
+            </div>
         </div>
         <div class="stat-card">
-            <div class="stat-value" id="stat-new-students">0</div>
-            <div class="stat-label"><span class="stat-dot stat-dot-pink"></span>本月新增</div>
+            <div class="stat-icon stat-icon--pink"><svg class="icon"><use href="#icon-user-plus"/></svg></div>
+            <div>
+                <div class="stat-value num" id="stat-new-students">0</div>
+                <div class="stat-label">本月新增</div>
+            </div>
         </div>
         <div class="stat-card">
-            <div class="stat-value" id="stat-teachers">0</div>
-            <div class="stat-label"><span class="stat-dot stat-dot-amber"></span>教师数</div>
+            <div class="stat-icon stat-icon--amber"><svg class="icon"><use href="#icon-graduation-cap"/></svg></div>
+            <div>
+                <div class="stat-value num" id="stat-teachers">0</div>
+                <div class="stat-label">教师数</div>
+            </div>
         </div>
         <div class="stat-card">
-            <div class="stat-value" id="stat-pending">0</div>
-            <div class="stat-label"><span class="stat-dot stat-dot-red"></span>草稿报告</div>
+            <div class="stat-icon stat-icon--red"><svg class="icon"><use href="#icon-file-text"/></svg></div>
+            <div>
+                <div class="stat-value num" id="stat-pending">0</div>
+                <div class="stat-label">草稿报告</div>
+            </div>
         </div>
         <div class="stat-card">
-            <div class="stat-value" id="stat-total-students">0</div>
-            <div class="stat-label"><span class="stat-dot stat-dot-green"></span>总学生数</div>
+            <div class="stat-icon stat-icon--green"><svg class="icon"><use href="#icon-database"/></svg></div>
+            <div>
+                <div class="stat-value num" id="stat-total-students">0</div>
+                <div class="stat-label">总学生数</div>
+            </div>
         </div>
     </div>
 
     <!-- 快捷操作 -->
     <div class="flex gap-3 mb-6 flex-wrap">
-        <a href="#/students" class="btn-primary" style="text-decoration:none;">➕ 新建学生</a>
-        <a href="#/teachers" class="btn-outline" style="text-decoration:none;">👨‍🏫 教师管理</a>
-        <a href="#/knowledge-base" class="btn-outline" style="text-decoration:none;">📚 知识库</a>
+        <a href="#/students" class="btn-primary" style="text-decoration:none;"><svg class="icon icon--md"><use href="#icon-plus"/></svg> 新建学生</a>
+        <a href="#/teachers" class="btn-outline" style="text-decoration:none;"><svg class="icon icon--md"><use href="#icon-graduation-cap"/></svg> 教师管理</a>
+        <a href="#/knowledge-base" class="btn-outline" style="text-decoration:none;"><svg class="icon icon--md"><use href="#icon-book-open"/></svg> 知识库</a>
     </div>
 
     <!-- 图表行 -->
-    <div class="grid grid-cols-2 gap-4 mb-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <div class="panel">
-            <div class="panel-title">📈 近 6 个月新增学生</div>
+            <div class="panel-title"><svg class="icon"><use href="#icon-trending-up"/></svg> 近 6 个月新增学生</div>
             <div id="trend-chart" style="height:220px;"></div>
         </div>
         <div class="panel">
-            <div class="panel-title">📊 学科分布（活跃学科）</div>
+            <div class="panel-title"><svg class="icon"><use href="#icon-pie-chart"/></svg> 学科分布（活跃学科）</div>
             <div id="dist-chart" style="height:220px;"></div>
         </div>
     </div>
 
     <!-- 学生看板 + 最近活动 -->
-    <div class="grid grid-cols-2 gap-4" style="align-items:start;">
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4" style="align-items:start;">
         <div class="panel" style="grid-column:span 1;">
-            <div class="panel-title mb-3">👥 学生看板</div>
+            <div class="panel-title mb-3"><svg class="icon"><use href="#icon-users"/></svg> 学生看板</div>
             <div id="board-columns" class="grid grid-cols-3 gap-3">
-                <div class="text-center py-6 text-gray-300 text-sm">加载中...</div>
+                <div class="col-span-3 text-center py-6 text-gray-300 text-sm">加载中...</div>
             </div>
         </div>
         <div class="panel">
-            <div class="panel-title">📌 最近活动</div>
+            <div class="panel-title"><svg class="icon"><use href="#icon-pin"/></svg> 最近活动</div>
             <div class="text-sm" id="activity-list">
-                <div class="text-center py-10 text-gray-300">
-                    <div class="text-2xl mb-2">📭</div>
-                    <p>暂无活动记录</p>
+                <div class="empty-state py-8">
+                    <div class="empty-icon"><svg class="icon"><use href="#icon-inbox"/></svg></div>
+                    <div class="empty-title">暂无活动记录</div>
                 </div>
             </div>
         </div>
@@ -107,7 +125,7 @@ function renderCharts(trend, dist) {
             yAxis: { type: 'value', minInterval: 1, splitLine: { lineStyle: { color: '#f1f5f9' } },
                 axisLabel: { color: '#94a3b8', fontSize: 11 } },
             series: [{ type: 'bar', data: trend.map(t => t.count), barWidth: '45%',
-                itemStyle: { color: '#3b82f6', borderRadius: [4, 4, 0, 0] } }],
+                itemStyle: { color: '#4f46e5', borderRadius: [4, 4, 0, 0] } }],
         });
     }
 
@@ -142,11 +160,11 @@ function renderBoard(board) {
     }
     box.innerHTML = STATUS_COLUMNS.map(col => {
         const items = board[col.key] || [];
-        return `<div class="bg-gray-50 rounded-lg p-2.5" style="border:1px solid #f1f5f9;">
-            <div class="text-xs font-semibold mb-2 flex items-center gap-1.5">
+        return `<div class="bg-white rounded-lg p-3" style="border:1px solid #f1f5f9;">
+            <div class="text-xs font-semibold mb-2 flex items-center gap-1.5 text-gray-600">
                 <span class="w-2 h-2 rounded-full" style="background:${col.color};"></span>
                 ${col.label}
-                <span class="text-gray-300 font-normal">${items.length}</span>
+                <span class="text-gray-300 font-normal num">${items.length}</span>
             </div>
             <div class="space-y-2" style="max-height:340px;overflow-y:auto;">
                 ${items.length ? items.map(cardHtml).join('') : '<div class="text-xs text-gray-300 text-center py-3">暂无</div>'}
@@ -156,12 +174,12 @@ function renderBoard(board) {
 }
 
 function cardHtml(s) {
-    return `<div onclick="location.hash='#/student/${s.id}'" class="bg-white rounded-lg p-2.5 cursor-pointer transition hover:shadow" style="border:1px solid #f1f5f9;">
+    return `<div onclick="location.hash='#/student/${s.id}'" class="bg-white rounded-lg p-3 cursor-pointer transition hover:shadow-md" style="border:1px solid #f1f5f9;">
         <div class="text-sm font-medium text-gray-800">${esc(s.name)} <span class="text-xs font-normal text-gray-400">${esc(s.grade || '')}</span></div>
-        <div class="mt-1 flex flex-wrap gap-1">
-            ${(s.subjects || []).map(x => `<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600">${esc(x)}</span>`).join('') || '<span class="text-[10px] text-gray-300">未开学科</span>'}
+        <div class="mt-1.5 flex flex-wrap gap-1">
+            ${(s.subjects || []).map(x => `<span class="badge badge--info">${esc(x)}</span>`).join('') || '<span class="text-[10px] text-gray-300">未开学科</span>'}
         </div>
-        <div class="mt-1 text-[10px] text-gray-300">${Utils.formatDate(s.updated_at, true)}</div>
+        <div class="mt-1.5 text-[10px] text-gray-300">${Utils.formatDate(s.updated_at, true)}</div>
     </div>`;
 }
 
@@ -170,19 +188,20 @@ function renderActivities(list) {
     const box = document.getElementById('activity-list');
     if (!box) return;
     if (!list || !list.length) {
-        box.innerHTML = `<div class="text-center py-10 text-gray-300">
-            <div class="text-2xl mb-2">📭</div><p>暂无活动记录</p></div>`;
+        box.innerHTML = `<div class="empty-state py-8">
+            <div class="empty-icon"><svg class="icon"><use href="#icon-inbox"/></svg></div>
+            <div class="empty-title">暂无活动记录</div></div>`;
         return;
     }
     box.innerHTML = list.map(a => {
         const who = a.student_name
             ? `<span class="font-medium text-gray-600">${esc(a.student_name)}</span>${a.subject_name ? `<span class="text-gray-300"> · ${esc(a.subject_name)}</span>` : ''}`
             : '';
-        return `<div class="py-2 border-b border-gray-50 flex items-center justify-between gap-2" style="border-color:#f8fafc;">
+        return `<div class="py-2 border-b flex items-center justify-between gap-2" style="border-color:#f8fafc;">
             <div class="text-sm text-gray-500 truncate">
                 ${who ? who + ' — ' : ''}${esc(a.action)}<span class="text-gray-300 text-xs ml-1">${esc(a.detail)}</span>
             </div>
-            <div class="text-gray-300 text-xs shrink-0">${Utils.formatDate(a.created_at, true)}</div>
+            <div class="text-gray-300 text-xs shrink-0 num">${Utils.formatDate(a.created_at, true)}</div>
         </div>`;
     }).join('');
 }

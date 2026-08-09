@@ -1,13 +1,13 @@
 <!-- AI 对话采集页 — 聊天式 UI -->
 <div class="fade-in">
     <!-- AI 未配置横幅 -->
-    <div id="conv-banner" class="hidden mb-4 px-4 py-3 rounded-lg bg-amber-50 border text-sm text-amber-700" style="border-color:#fde68a;">
-        ⚠️ 尚未配置 AI 服务。请先到 <a href="#/settings" class="text-blue-500 underline font-medium">系统设置</a> 配置 LLM 后，回来重新开始对话。
+    <div id="conv-banner" class="hidden mb-4 px-4 py-3 rounded-lg bg-amber-50 border text-sm text-amber-700 inline-flex items-center gap-1.5" style="border-color:#fde68a;">
+        <svg class="icon icon--sm flex-shrink-0"><use href="#icon-alert-triangle"/></svg> 尚未配置 AI 服务。请先到 <a href="#/settings" class="text-blue-500 underline font-medium">系统设置</a> 配置 LLM 后，回来重新开始对话。
     </div>
 
     <!-- 首问生成失败横幅（已配置但 AI 首次提问失败，可重试） -->
-    <div id="conv-retry-banner" class="hidden mb-4 px-4 py-3 rounded-lg bg-amber-50 border text-sm text-amber-700" style="border-color:#fde68a;">
-        ⚠️ AI 首次提问生成失败。<button onclick="retryFirstQuestion()" class="text-blue-500 underline font-medium ml-1">重新生成首问</button>
+    <div id="conv-retry-banner" class="hidden mb-4 px-4 py-3 rounded-lg bg-amber-50 border text-sm text-amber-700 inline-flex items-center gap-1.5" style="border-color:#fde68a;">
+        <svg class="icon icon--sm flex-shrink-0"><use href="#icon-alert-triangle"/></svg> AI 首次提问生成失败。<button onclick="retryFirstQuestion()" class="text-blue-500 underline font-medium ml-1">重新生成首问</button>
     </div>
 
     <div class="panel flex flex-col" style="height:calc(100vh - 190px); padding:0; overflow:hidden;">
@@ -17,15 +17,15 @@
                 <div class="font-semibold text-gray-800 text-sm" id="conv-title">AI 学情采集</div>
                 <div class="text-xs text-gray-400 mt-0.5" id="conv-subtitle">正在加载...</div>
             </div>
-            <button id="conv-end-btn" onclick="endConversation()" class="btn-outline" style="padding:6px 16px;font-size:13px;">⏹ 提前结束</button>
+            <button id="conv-end-btn" onclick="endConversation()" class="btn-outline" style="padding:6px 16px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-stop-circle"/></svg> 提前结束</button>
         </div>
 
         <!-- 消息区 -->
         <div id="conv-messages" class="flex-1 overflow-y-auto px-5 py-4" style="background:#f8fafc;"></div>
 
         <!-- AI 认为信息已足够 → 结束建议条 -->
-        <div id="conv-end-suggest" class="hidden px-5 py-2.5 text-xs flex items-center justify-between" style="background:#eff6ff; border-top:1px solid #dbeafe;">
-            <span class="text-blue-600">🤖 AI 认为信息已足够，可以结束对话并生成学情总结</span>
+        <div id="conv-end-suggest" class="hidden px-5 py-2.5 text-xs flex items-center justify-between" style="background:#eef2ff; border-top:1px solid #c7d2fe;">
+            <span class="text-indigo-600 inline-flex items-center gap-1.5"><svg class="icon icon--md"><use href="#icon-bot"/></svg> AI 认为信息已足够，可以结束对话并生成学情总结</span>
             <button onclick="endConversation()" class="btn-primary" style="padding:5px 14px;font-size:12px;">结束对话</button>
         </div>
 
@@ -33,7 +33,7 @@
         <div id="conv-input-area" class="flex items-center gap-2 px-5 py-3 border-t" style="border-color:#f1f5f9;">
             <input id="conv-input" class="flex-1" style="border-radius:9999px; padding:9px 18px;"
                 placeholder="输入学生信息，回车发送..." onkeydown="onInputKeydown(event)">
-            <button id="conv-send-btn" onclick="sendMessage()" class="btn-primary" style="border-radius:9999px; padding:9px 24px; background:linear-gradient(135deg,#3b82f6,#2563eb);">发送</button>
+            <button id="conv-send-btn" onclick="sendMessage()" class="btn-primary" style="border-radius:9999px; padding:9px 24px; background:linear-gradient(135deg,#4f46e5,#4338ca);">发送</button>
         </div>
     </div>
 </div>
@@ -66,7 +66,7 @@ function renderBubble(m) {
         : '';
     const row = document.createElement('div');
     row.className = `conv-msg-row ${isAi ? 'conv-msg-ai' : 'conv-msg-user'}`;
-    const avatar = `<div class="conv-avatar ${isAi ? 'ai' : 'user'}">${isAi ? '🤖' : '👤'}</div>`;
+    const avatar = `<div class="conv-avatar ${isAi ? 'ai' : 'user'}">${isAi ? '<svg class="icon"><use href="#icon-bot"/></svg>' : '<svg class="icon"><use href="#icon-user"/></svg>'}</div>`;
     const body = `<div class="conv-msg-body">` +
         `<div class="conv-bubble ${isAi ? 'ai' : 'user'}">${Utils.escapeHtml(m.content || '')}</div>` +
         (time ? `<div class="conv-msg-time">${time}</div>` : '') +
@@ -94,7 +94,7 @@ function setTyping(on) {
         el = document.createElement('div');
         el.id = 'conv-typing';
         el.className = 'conv-msg-row conv-msg-ai';
-        el.innerHTML = `<div class="conv-avatar ai">🤖</div>` +
+        el.innerHTML = `<div class="conv-avatar ai"><svg class="icon"><use href="#icon-bot"/></svg></div>` +
             `<div class="conv-msg-body"><div class="conv-bubble ai"><span class="typing-dots">` +
             `<span class="dot"></span><span class="dot"></span><span class="dot"></span></span></div></div>`;
         container.appendChild(el);
@@ -148,9 +148,9 @@ function showCompleted(summary) {
     footer.className = 'px-5 py-3 border-t flex items-center justify-between';
     footer.style.borderColor = '#f1f5f9';
     footer.innerHTML = `
-        <div class="text-sm text-green-600 font-medium">✅ 对话已结束，本次采集完成</div>
+        <div class="text-sm text-green-600 font-medium inline-flex items-center gap-1.5"><svg class="icon icon--md"><use href="#icon-check-circle"/></svg> 对话已结束，本次采集完成</div>
         <div class="flex items-center gap-2">
-            <button onclick="generateReport(this)" class="btn-primary" style="padding:7px 16px;font-size:13px;">📄 生成报告</button>
+            <button onclick="generateReport(this)" class="btn-primary" style="padding:7px 16px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-file-text"/></svg> 生成报告</button>
             <button onclick="location.hash='#/student/${state.studentId}/subject/${subjectId}'" class="btn-outline" style="padding:7px 16px;font-size:13px;">返回学科详情</button>
         </div>
     `;

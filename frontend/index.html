@@ -7,7 +7,7 @@
     <script>
     // ===== 前端版本自愈机制：每次改动前端代码后递增 APP_VERSION，浏览器自动强制刷新一次 =====
     // 配合后端 no-store 缓存策略，保证用户永远加载到最新代码，无需手动清缓存
-    window.APP_VERSION = '24';
+    window.APP_VERSION = '25';
     (function () {
         try {
             var saved = localStorage.getItem('ta_app_ver');
@@ -28,7 +28,7 @@
     });
     </script>
     <!-- Tailwind CSS（本地编译产物，见 build_tailwind.py；改动 class 后需重跑该脚本） -->
-    <link rel="stylesheet" href="vendor/tailwind.css?v=24">
+    <link rel="stylesheet" href="vendor/tailwind.css?v=25">
     <!-- Vue 3 -->
     <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
     <!-- Vue Router 4 -->
@@ -39,22 +39,24 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.8/dist/html2canvas-pro.min.js"></script>
     <!-- 自定义样式（v 为版本号，改动前端后递增，强制浏览器刷新缓存） -->
-    <link rel="stylesheet" href="css/style.css?v=24">
+    <link rel="stylesheet" href="css/style.css?v=25">
 </head>
 <body>
     <div id="app">
-        <div class="flex h-screen bg-gray-50">
+        <div class="flex h-screen bg-slate-50">
             <!-- 侧边栏 -->
             <div id="navbar-container"></div>
 
             <!-- 主内容区 -->
             <div class="flex-1 flex flex-col overflow-hidden">
                 <!-- 顶部栏 -->
-                <header class="bg-white border-b px-6 py-3 flex items-center justify-between" style="border-color: #f1f5f9;">
-                    <h1 class="text-base font-bold text-gray-800" id="page-title">工作台</h1>
+                <header class="bg-white border-b border-slate-100 px-6 py-3 flex items-center justify-between">
+                    <h1 class="text-base font-bold text-slate-800" id="page-title">工作台</h1>
                     <div class="flex items-center gap-4">
-                        <button onclick="window.refreshPage && refreshPage()" class="text-xs text-gray-400 hover:text-blue-500 transition" title="刷新当前页面数据">↻ 刷新</button>
-                        <div class="text-xs text-gray-400" id="header-info"></div>
+                        <button onclick="window.refreshPage && refreshPage()" class="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-500 transition" title="刷新当前页面数据">
+                            <svg class="icon icon--sm"><use href="#icon-refresh-cw"/></svg> 刷新
+                        </button>
+                        <div class="text-xs text-slate-400" id="header-info"></div>
                     </div>
                 </header>
 
@@ -68,8 +70,8 @@
 
     <toast-widget></toast-widget>
 
-    <script src="js/utils.js?v=24"></script>
-    <script src="js/api.js?v=24"></script>
-    <script src="js/app.js?v=24"></script>
+    <script src="js/utils.js?v=25"></script>
+    <script src="js/api.js?v=25"></script>
+    <script src="js/app.js?v=25"></script>
 </body>
 </html>

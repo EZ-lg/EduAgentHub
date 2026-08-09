@@ -28,11 +28,11 @@ window.Utils = {
      */
     subjectIcon(name) {
         const map = {
-            '数学': '📐', '英语': '📝', '物理': '⚡', '化学': '🧪',
-            '语文': '📖', '生物': '🧬', '历史': '📜', '地理': '🌍',
-            '政治': '⚖️', '其他': '📚'
+            '数学': 'icon-calculator', '英语': 'icon-languages', '物理': 'icon-zap', '化学': 'icon-flask-conical',
+            '语文': 'icon-book', '生物': 'icon-dna', '历史': 'icon-landmark', '地理': 'icon-globe',
+            '政治': 'icon-scale', '其他': 'icon-book-open'
         };
-        return map[name] || '📚';
+        return map[name] || 'icon-book-open';
     },
 
     /**
@@ -40,15 +40,15 @@ window.Utils = {
      */
     statusLabel(status) {
         const map = {
-            'active': { text: '在读', cls: 'bg-green-100 text-green-700' },
-            'completed': { text: '已结课', cls: 'bg-gray-100 text-gray-600' },
-            'abandoned': { text: '已放弃', cls: 'bg-red-100 text-red-600' },
-            'paused': { text: '已停用', cls: 'bg-yellow-100 text-yellow-700' },
-            'in_progress': { text: '进行中', cls: 'bg-blue-100 text-blue-700' },
-            'draft': { text: '草稿', cls: 'bg-gray-100 text-gray-500' },
-            'published': { text: '已发布', cls: 'bg-green-100 text-green-700' },
+            'active': { text: '在读', cls: 'badge badge--success' },
+            'completed': { text: '已结课', cls: 'badge badge--neutral' },
+            'abandoned': { text: '已放弃', cls: 'badge badge--danger' },
+            'paused': { text: '已停用', cls: 'badge badge--warning' },
+            'in_progress': { text: '进行中', cls: 'badge badge--info' },
+            'draft': { text: '草稿', cls: 'badge badge--neutral' },
+            'published': { text: '已发布', cls: 'badge badge--success' },
         };
-        return map[status] || { text: status, cls: 'bg-gray-100 text-gray-600' };
+        return map[status] || { text: status, cls: 'badge badge--neutral' };
     },
 
     /**
@@ -95,18 +95,10 @@ window.Utils = {
 
         const mask = document.createElement('div');
         mask.className = 'ta-modal-mask';
-        Object.assign(mask.style, {
-            position: 'fixed', inset: '0', background: 'rgba(15,23,42,0.35)',
-            zIndex: 1000, display: 'flex', alignItems: 'flex-start',
-            justifyContent: 'center', paddingTop: '10vh',
-        });
 
         const panel = document.createElement('div');
-        Object.assign(panel.style, {
-            background: '#fff', borderRadius: '12px', width: width + 'px',
-            maxWidth: '92vw', boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
-            overflow: 'hidden', animation: 'fadeIn 0.15s ease-out',
-        });
+        panel.className = 'ta-modal-panel';
+        panel.style.width = width + 'px';
 
         // 渲染字段；支持 section 分组标题、full 占整行、columns 两列
         let fieldHtml = '', lastSection = '';
@@ -155,15 +147,17 @@ window.Utils = {
             : (columns === 2 ? `<div class="grid grid-cols-2 gap-x-4">${fieldHtml}</div>` : fieldHtml);
 
         panel.innerHTML = `
-            <div class="flex items-center justify-between px-5 py-3 border-b" style="border-color:#f1f5f9;">
+            <div class="ta-modal-head">
                 <div>
                     <div class="font-semibold text-gray-800 text-sm">${Utils.escapeHtml(title)}</div>
                     ${subtitle ? `<div class="text-xs text-gray-400 mt-0.5">${Utils.escapeHtml(subtitle)}</div>` : ''}
                 </div>
-                <button class="text-gray-300 hover:text-gray-500 text-lg leading-none" data-close>×</button>
+                <button class="text-gray-300 hover:text-gray-500 text-lg leading-none" data-close>
+                    <svg class="icon icon--sm"><use href="#icon-x"/></svg>
+                </button>
             </div>
-            <div class="px-5 py-4 max-h-[65vh] overflow-y-auto">${body}</div>
-            <div class="flex justify-end gap-2 px-5 py-3 border-t" style="border-color:#f1f5f9;">
+            <div class="ta-modal-body">${body}</div>
+            <div class="ta-modal-foot">
                 <button class="btn-outline" data-close style="padding:7px 18px;">取消</button>
                 ${hideOk ? '' : '<button class="btn-primary" data-ok style="padding:7px 18px;">确定</button>'}
             </div>
@@ -220,25 +214,18 @@ window.Utils = {
 
         const mask = document.createElement('div');
         mask.className = 'ta-modal-mask';
-        Object.assign(mask.style, {
-            position: 'fixed', inset: '0', background: 'rgba(15,23,42,0.35)',
-            zIndex: 1000, display: 'flex', alignItems: 'flex-start',
-            justifyContent: 'center', paddingTop: '30vh',
-        });
+        mask.style.paddingTop = '30vh';
 
         const panel = document.createElement('div');
-        Object.assign(panel.style, {
-            background: '#fff', borderRadius: '12px', width: '420px',
-            maxWidth: '92vw', boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
-            overflow: 'hidden', animation: 'fadeIn 0.15s ease-out',
-        });
+        panel.className = 'ta-modal-panel';
+        panel.style.width = '420px';
 
         panel.innerHTML = `
-            <div class="px-5 pt-5 pb-2">
+            <div class="ta-modal-body pt-5">
                 <div class="font-semibold text-gray-800 text-sm mb-2">${Utils.escapeHtml(title)}</div>
                 <div class="text-sm text-gray-500 leading-relaxed">${message}</div>
             </div>
-            <div class="flex justify-end gap-2 px-5 py-3 border-t mt-2" style="border-color:#f1f5f9;">
+            <div class="ta-modal-foot">
                 <button class="btn-outline" data-close style="padding:7px 18px;">取消</button>
                 <button class="btn-primary" data-ok
                     style="padding:7px 18px;${danger ? 'background:#ef4444;' : ''}">确定</button>

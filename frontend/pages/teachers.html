@@ -1,11 +1,14 @@
 <!-- 教师管理页 — P7a：教师 CRUD + 擅长科目多选 + 课程规划选教师 -->
 <div class="fade-in">
     <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <h2 class="text-sm font-semibold text-gray-700">教师列表 <span class="text-xs text-gray-400 font-normal" id="teacher-count"></span></h2>
+        <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5"><svg class="icon icon--md text-indigo-500"><use href="#icon-graduation-cap"/></svg> 教师列表 <span class="text-xs text-gray-400 font-normal" id="teacher-count"></span></h2>
         <div class="flex gap-2">
-            <input id="teacher-search" type="text" placeholder="🔍 搜索姓名/科目" oninput="searchTeachers(this.value)"
-                   class="text-sm border rounded-lg px-3 py-1.5" style="width:200px; border-color:#e2e8f0;">
-            <button onclick="showAddTeacherModal()" class="btn-primary" style="padding:6px 16px;font-size:13px;">➕ 新增教师</button>
+            <div style="position:relative;">
+                <svg class="icon icon--sm" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;"><use href="#icon-search"/></svg>
+                <input id="teacher-search" type="text" placeholder="搜索姓名/科目" oninput="searchTeachers(this.value)"
+                       class="text-sm border rounded-lg py-1.5" style="width:200px;border-color:#e2e8f0;padding-left:30px;">
+            </div>
+            <button onclick="showAddTeacherModal()" class="btn-primary" style="padding:6px 16px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-plus"/></svg> 新增教师</button>
         </div>
     </div>
 
@@ -23,10 +26,12 @@
             </thead>
             <tbody id="teachers-tbody"></tbody>
         </table>
-        <div class="text-center py-12 text-gray-400 hidden" id="teachers-empty">
-            <div class="text-4xl mb-3">👨‍🏫</div>
-            <div class="text-sm mb-1">暂无教师</div>
-            <div class="text-xs text-gray-300">点击右上角「➕ 新增教师」添加，课程规划里即可按教师指派课时</div>
+        <div class="hidden" id="teachers-empty">
+            <div class="empty-state">
+                <div class="empty-icon"><svg class="icon"><use href="#icon-graduation-cap"/></svg></div>
+                <div class="empty-title">暂无教师</div>
+                <div class="empty-desc">点击右上角「新增教师」添加，课程规划里即可按教师指派课时</div>
+            </div>
         </div>
     </div>
 </div>
@@ -72,13 +77,13 @@ async function loadTeachers() {
         <tr class="border-b align-top" style="border-color:#f1f5f9;">
             <td class="py-2.5 font-medium text-gray-800">${esc(t.name)}</td>
             <td class="py-2.5">
-                ${parseSubjects(t.subjects).map(s => `<span class="inline-block px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-600 mr-1 mb-1">${esc(s)}</span>`).join('') || '<span class="text-gray-300">-</span>'}
+                ${parseSubjects(t.subjects).map(s => `<span class="badge badge--info mr-1 mb-1">${esc(s)}</span>`).join('') || '<span class="text-gray-300">-</span>'}
             </td>
-            <td class="py-2.5 text-gray-500">${esc(t.phone) || '-'}</td>
+            <td class="py-2.5 text-gray-500 num">${esc(t.phone) || '-'}</td>
             <td class="py-2.5 text-gray-500 truncate" style="max-width:300px;">${esc(t.intro) || '-'}</td>
             <td class="py-2.5">
-                <button onclick="editTeacher(${t.id})" class="text-xs text-gray-400 hover:text-blue-500 mr-2" title="编辑">✏️</button>
-                <button onclick="deleteTeacher(${t.id})" class="text-xs text-gray-300 hover:text-red-500" title="删除">🗑️</button>
+                <button onclick="editTeacher(${t.id})" class="icon-btn mr-1" title="编辑"><svg class="icon"><use href="#icon-pencil"/></svg></button>
+                <button onclick="deleteTeacher(${t.id})" class="icon-btn icon-btn--danger" title="删除"><svg class="icon"><use href="#icon-trash-2"/></svg></button>
             </td>
         </tr>`).join('');
 }

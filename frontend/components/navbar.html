@@ -1,33 +1,38 @@
-<!-- 侧边栏导航 — 白色简洁风 -->
+<!-- 侧边栏导航 — 深色专业风 -->
 <nav class="sidebar h-full flex flex-col">
     <!-- Logo -->
-    <div class="sidebar-logo-area px-5 py-4">
-        <div class="text-base font-bold text-gray-800">教培智能体</div>
-        <div class="text-xs text-gray-400 mt-0.5" id="navbar-org-name">XX教育机构</div>
+    <div class="sidebar-logo-area px-5 py-5">
+        <div class="flex items-center gap-2.5">
+            <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-600 text-white flex-shrink-0">
+                <svg class="icon"><use href="#icon-graduation-cap"/></svg>
+            </span>
+            <span class="text-[15px] font-bold text-white tracking-wide">教培智能体</span>
+        </div>
+        <div class="text-xs text-slate-500 mt-2" id="navbar-org-name">XX教育机构</div>
     </div>
 
     <!-- 主导航 -->
     <div class="flex-1 py-3 overflow-y-auto">
         <a href="#/dashboard" data-route="/dashboard" onclick="updateNavActive(this)">
-            <span class="icon">📊</span> 工作台
+            <svg class="icon"><use href="#icon-layout-dashboard"/></svg> 工作台
         </a>
         <a href="#/students" data-route="/students" onclick="updateNavActive(this)">
-            <span class="icon">👥</span> 学生档案
+            <svg class="icon"><use href="#icon-users"/></svg> 学生档案
         </a>
         <a href="#/teachers" data-route="/teachers" onclick="updateNavActive(this)">
-            <span class="icon">👨‍🏫</span> 教师管理
+            <svg class="icon"><use href="#icon-graduation-cap"/></svg> 教师管理
         </a>
         <a href="#/knowledge-base" data-route="/knowledge-base" onclick="updateNavActive(this)">
-            <span class="icon">📚</span> 知识库
+            <svg class="icon"><use href="#icon-book-open"/></svg> 知识库
         </a>
     </div>
 
     <!-- 底部：系统设置 + 版本 -->
     <div class="sidebar-footer">
         <a href="#/settings" data-route="/settings" onclick="updateNavActive(this)" class="mb-0 mx-2" style="margin-bottom:0;">
-            <span class="icon">⚙️</span> 系统设置
+            <svg class="icon"><use href="#icon-settings"/></svg> 系统设置
         </a>
-        <div class="px-5 py-2 text-xs text-gray-300">
+        <div class="px-5 py-2.5 text-[11px] text-slate-600">
             v1.0.0 · P2
         </div>
     </div>
