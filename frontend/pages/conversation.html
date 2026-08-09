@@ -31,8 +31,8 @@
 
         <!-- 输入区 -->
         <div id="conv-input-area" class="flex items-center gap-2 px-5 py-3 border-t" style="border-color:#f1f5f9;">
-            <input id="conv-input" class="flex-1" style="border-radius:9999px; padding:9px 18px;"
-                placeholder="输入学生信息，回车发送..." onkeydown="onInputKeydown(event)">
+            <input id="conv-input" class="flex-1" maxlength="2000" style="border-radius:9999px; padding:9px 18px;"
+                placeholder="输入学生信息，回车发送...（最多 2000 字）" onkeydown="onInputKeydown(event)">
             <button id="conv-send-btn" onclick="sendMessage()" class="btn-primary" style="border-radius:9999px; padding:9px 24px; background:linear-gradient(135deg,#4f46e5,#4338ca);">发送</button>
         </div>
     </div>

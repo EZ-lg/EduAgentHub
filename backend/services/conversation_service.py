@@ -28,6 +28,8 @@ DIALOGUE_TEMPERATURE = 0.4
 SUMMARY_TEMPERATURE = 0.3
 # 学情总结追加为 AI 消息时的固定前缀（展示用），返回给前端时统一剥掉保持 summary 字段一致
 SUMMARY_PREFIX = "【学情总结】\n"
+# 长对话保护：传给 LLM 的 history 超过上限时截断，只保留最近 N 条 + 头部占位，防 prompt 膨胀
+MAX_HISTORY_MSGS = 60
 
 
 # ---------------------------------------------------------------- 私有工具
@@ -72,12 +74,17 @@ def _append(db: Session, conv: AIConversation, role: str, content: str) -> list:
 
 
 def _display_history(msgs: list) -> list:
-    """把 ai/user 角色映射为 assistant/user，供 Jinja2 模板渲染对话历史"""
+    """把 ai/user 角色映射为 assistant/user，供 Jinja2 模板渲染对话历史（超长自动截断）"""
     result = []
     for m in msgs:
         role = m.get("role", "")
         mapped = "assistant" if role in ("ai", "assistant") else "user"
         result.append({"role": mapped, "content": m.get("content", "")})
+    if len(result) > MAX_HISTORY_MSGS:
+        keep = result[-MAX_HISTORY_MSGS:]
+        head = {"role": "assistant",
+                "content": "（前方已有较长的早期对话，早期信息已采集，以下为最近对话的重点）"}
+        return [head] + keep
     return result
 
 
@@ -268,6 +275,8 @@ def handle_message(db: Session, subject_id: int, conversation_id: int, message_t
     text = (message_text or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="消息内容不能为空")
+    if len(text) > 2000:
+        raise HTTPException(status_code=400, detail="消息内容过长（最多 2000 字），请精简后重试")
 
     msgs = _append(db, conv, "user", text)
 
