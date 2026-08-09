@@ -142,3 +142,114 @@ def update_student_status(student_id: int, data: dict, db: Session = Depends(get
     log_activity(db, "更新学生状态", f"学生「{student.name}」→{label}", student_id=student.id)
     db.commit()
     return success_response(student.to_dict())
+
+
+# ---------------------------------------------------------------- 档案 AI 对话
+
+def _build_student_profile(student: Student) -> str:
+    """学生档案 → 文本（供 AI 对话上下文）"""
+    parts = [
+        f"姓名：{student.name}",
+        f"年级：{student.grade or '未填'}",
+        f"学校：{student.school or '未填'}",
+        f"性别：{student.gender or '未填'}",
+        f"电话：{student.phone or '未填'}",
+        f"家长：{student.parent_name or '未填'} {student.parent_phone or ''}".strip(),
+        f"地址：{student.address or '未填'}",
+        f"来源：{student.source or '未填'}",
+        f"状态：{'在读' if student.status == 'active' else ('已结课' if student.status == 'completed' else '已放弃')}",
+    ]
+    if student.notes:
+        parts.append(f"备注：{student.notes}")
+    return "\n".join(parts)
+
+
+def _build_subjects_context(db: Session, student_id: int) -> str:
+    """各学科 + 最近报告总结 + 成绩概况 → 文本（供 AI 对话上下文）"""
+    from backend.models.ai_conversation import AIConversation
+    from backend.models.report import Report
+    from backend.models.score import Score
+
+    subjects = db.query(Subject).filter(Subject.student_id == student_id).all()
+    if not subjects:
+        return ""
+    lines = []
+    for sub in subjects:
+        status_txt = "活跃" if sub.status == "active" else "已停用"
+        line = f"- {sub.name}（{status_txt}）"
+        # 最近报告总结
+        report = db.query(Report).filter(
+            Report.subject_id == sub.id
+        ).order_by(Report.created_at.desc()).first()
+        if report:
+            try:
+                import json
+                content = json.loads(report.content_json or "{}")
+                if isinstance(content, dict) and content.get("summary"):
+                    line += f"\n  最近学情总结：{str(content['summary'])[:200]}"
+            except (json.JSONDecodeError, TypeError):
+                pass
+        # 成绩概况
+        scores = db.query(Score).filter(Score.subject_id == sub.id).order_by(Score.exam_date.desc()).all()
+        if scores:
+            recent = scores[:3]
+            score_txt = "，".join(f"{s.exam_name or s.exam_date[:10]} {s.score}/{s.total_score}" for s in recent)
+            line += f"\n  最近成绩：{score_txt}"
+        else:
+            line += "\n  成绩：暂无"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+@router.post("/{student_id}/chat")
+def student_chat(student_id: int, data: dict = None, db: Session = Depends(get_db)):
+    """基于学生档案 + 各学科学情回答教务/家长提问。
+
+    body: {messages: [{role: 'user'|'ai', content}]}，messages 为前端维护的完整历史。
+    """
+    from backend.ai.manager import ai_manager
+    from backend.ai.prompts.prompt_loader import render_prompt
+
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="学生不存在")
+
+    if not ai_manager.is_configured("llm"):
+        raise HTTPException(status_code=503, detail="AI 服务未配置，请先在系统设置中配置 LLM")
+
+    messages = (data or {}).get("messages") or []
+    if not isinstance(messages, list):
+        messages = []
+    # 取最后一条用户消息作为提问
+    last_user = ""
+    history = []
+    for m in messages:
+        role = str(m.get("role") or "").lower()
+        content = str(m.get("content") or "").strip()
+        if not content:
+            continue
+        if role in ("user", "human"):
+            last_user = content
+            history.append({"role": "user", "content": content})
+        elif role in ("ai", "assistant"):
+            history.append({"role": "ai", "content": content})
+    if not last_user:
+        raise HTTPException(status_code=400, detail="缺少用户提问内容")
+
+    llm = ai_manager.get_llm()
+    prompt = render_prompt(
+        "student_chat.txt",
+        student_name=student.name,
+        student_profile=_build_student_profile(student),
+        subjects_context=_build_subjects_context(db, student_id),
+        history=history[:-1] if history else [],  # 历史不含最后一条（已单独放 last_message）
+        last_message=last_user,
+    )
+    try:
+        reply = llm.chat([
+            {"role": "system", "content": render_prompt("system_prompt.txt")},
+            {"role": "user", "content": prompt},
+        ]) or ""
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"AI 调用失败：{e}")
+    return success_response({"reply": reply.strip()})

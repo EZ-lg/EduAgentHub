@@ -82,11 +82,12 @@ tutoring-agent/
 │   │   ├── communication_log.py
 │   │   ├── teacher.py
 │   │   ├── knowledge_doc.py
+│   │   ├── qa_history.py
+│   │   ├── activity_log.py
 │   │   └── setting.py
 │   ├── services/               # 业务逻辑层
 │   │   ├── conversation_service.py
-│   │   ├── report_generator.py
-│   │   ├── course_planner.py
+│   │   ├── report_generator.py   # 报告生成 + 课程规划(_create_course_plan) + RAG引用
 │   │   ├── score_analyzer.py
 │   │   ├── kb_service.py
 │   │   └── document_parser.py
@@ -132,14 +133,9 @@ tutoring-agent/
 │   │   ├── knowledge_qa.html
 │   │   └── settings.html
 │   ├── components/
-│   │   ├── navbar.html
-│   │   ├── student_card.html
-│   │   ├── subject_card.html
-│   │   └── ai_editor.html
-│   └── vendor/                 # CDN 离线备用（打包前下载）
-│       ├── vue.global.prod.js
-│       ├── vue-router.global.prod.js
-│       └── echarts.min.js
+│   │   └── navbar.html
+│   └── vendor/                 # 本地资源（Tailwind 已编译；Vue/Router/ECharts 等打包前下载离线）
+│       └── tailwind.css
 │
 ├── data/                       # 运行时数据（不打包进exe）
 │   ├── tutoring.db             # SQLite 自动创建
@@ -224,8 +220,8 @@ tutoring-agent/
 | P5 报告生成导出 | ✅ 已完成 | 报告生成 + 4节预览/编辑 + 重新生成 + 课程规划表格 + PDF导出 |
 | P6 成绩+规划 | ✅ 已完成 | 成绩录入(单条/批量) + ECharts曲线(原始分/百分制/目标参考线) + AI分析 + 课程规划编辑器 + 版本历史/回退 + AI课程调整 |
 | P7 教师+日志 | ✅ 已完成 | 教师CRUD + 擅长科目多选 + 沟通日志CRUD |
-| P8 知识库+问答 | ⬜ 待开发 | 上传/解析/入库 + 管理界面 + 智能问答 |
-| P9 工作台+打包 | ⬜ 待开发 | 统计看板 + PyInstaller + 全流程测试 |
+| P8 知识库+问答 | ✅ 已完成 | 上传/解析/入库(ChromaDB) + 管理界面 + 智能问答(RAG) + AI分类/改写/历史/异步 |
+| P9 工作台+打包 | 🔶 工作台完成，打包未做 | 活动日志埋点 + 统计看板 + 机构信息设置；PyInstaller 单 exe 待做 |
 
 ---
 

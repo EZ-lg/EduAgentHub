@@ -14,8 +14,7 @@
             <button onclick="regenerateAll()" class="btn-outline" style="padding:7px 12px;font-size:13px;">🔄 重新生成</button>
             <button onclick="showPlanVersions()" class="btn-outline" style="padding:7px 12px;font-size:13px;">📜 规划版本</button>
             <button onclick="exportDocx()" class="btn-primary" style="padding:7px 12px;font-size:13px;">📄 导出 Word</button>
-            <button onclick="window.print()" class="btn-outline" style="padding:7px 12px;font-size:13px;">🖨️ 打印</button>
-            <button id="publish-btn" onclick="togglePublish()" class="btn-outline" style="padding:7px 12px;font-size:13px;">发布</button>
+            <button onclick="deleteReport()" class="btn-outline" style="padding:7px 12px;font-size:13px;color:#dc2626;">🗑️ 删除</button>
         </div>
     </div>
 
@@ -41,14 +40,6 @@
     </div>
 </div>
 
-<style>
-    @media print {
-        .no-print { display: none !important; }
-        body { background: #fff !important; }
-        #report-export-area { box-shadow: none !important; border: none !important; }
-    }
-</style>
-
 <script>
 (function () {
 const reportId = parseInt(location.hash.split('/')[2]);
@@ -63,6 +54,7 @@ const state = {
     teachers: [],
     orgName: store.orgName,
     orgLogo: '',
+    orgDefaults: { lesson_hours: 1.5, weekly_days: 6, off_day: '周日' },
     busy: false,
 };
 
@@ -109,6 +101,11 @@ async function loadReport() {
             if (pr.success && pr.data.org_info && pr.data.org_info.logo) state.orgLogo = pr.data.org_info.logo;
         } catch (e) { /* 兜底 */ }
 
+        try {
+            const sr = await API.settings.getAll();
+            if (sr.success && sr.data.org_defaults) state.orgDefaults = Object.assign({}, state.orgDefaults, sr.data.org_defaults);
+        } catch (e) { /* 兜底 */ }
+
         loading.classList.add('hidden');
         document.getElementById('report-action-bar').classList.remove('hidden');
         document.getElementById('report-export-area').classList.remove('hidden');
@@ -123,7 +120,7 @@ function safeParse(str, fallback) {
 }
 
 /* ---------- 渲染 ---------- */
-function renderReport() {
+function renderReport(preserveInputs = true) {
     if (!state.report) return;
     const r = state.report;
     const status = Utils.statusLabel(r.status);
@@ -131,7 +128,6 @@ function renderReport() {
     document.getElementById('report-status-badge').innerHTML =
         `<span class="px-2 py-0.5 rounded-full text-xs ${status.cls}">${status.text}</span>`;
     document.getElementById('report-source-badge').textContent = 'AI 生成';
-    document.getElementById('publish-btn').textContent = r.status === 'published' ? '取消发布' : '发布';
 
     document.getElementById('pdf-org').textContent = state.orgName;
     const logoImg = document.getElementById('pdf-logo');
@@ -153,9 +149,14 @@ function renderReport() {
     }
 
     // 快照课程规划表格输入值（重渲染后恢复，避免未保存编辑丢失）
-    const snap = snapshotPlanInputs();
-    document.getElementById('report-sections').innerHTML = buildSectionsHtml();
-    restorePlanInputs(snap);
+    // preserveInputs=false：数据已被程序更新（如重生成后），用新数据渲染，不再用旧值覆盖
+    if (preserveInputs !== false) {
+        const snap = snapshotPlanInputs();
+        document.getElementById('report-sections').innerHTML = buildSectionsHtml();
+        restorePlanInputs(snap);
+    } else {
+        document.getElementById('report-sections').innerHTML = buildSectionsHtml();
+    }
     renderKbReferences(r.kb_references_json);
 }
 
@@ -238,7 +239,6 @@ function renderPlanChapterHtml(i, ch) {
                 <div class="flex gap-1 edit-btn">
                     <button onclick="editSection(${i})" class="btn-outline" style="padding:4px 10px;font-size:12px;">✏️ 编辑</button>
                     <button onclick="regenerateSection(${i})" class="btn-outline" style="padding:4px 10px;font-size:12px;">🔄 重生成</button>
-                    <button onclick="regeneratePlan()" class="btn-outline" style="padding:4px 10px;font-size:12px;">🔄 重生成规划</button>
                 </div>
             </div>
             ${renderParagraphs(ch.content)}
@@ -309,7 +309,7 @@ function assignTeacherAll(tid) {
         row.teacher_id = newTid;
         row.teacher_name = teacher ? teacher.name : '';
     });
-    renderReport();
+    renderReport(false);
     showToast(newTid ? `已统一指派教师：${teacher ? teacher.name : ''}（记得点「💾 保存规划」）` : '已清除教师指派', 'success');
 }
 
@@ -319,15 +319,16 @@ function addPlanRow() {
         const n = parseInt(r.lesson);
         return !isNaN(n) && n > m ? n : m;
     }, 0);
-    plan.push({ lesson: `第${maxLesson + 1}课`, content: '', hours: null, teacher_id: null, teacher_name: '', schedule: '', notes: '' });
-    renderReport();
+    const defHours = Number(state.orgDefaults.lesson_hours) || null;
+    plan.push({ lesson: `第${maxLesson + 1}课`, content: '', hours: defHours, teacher_id: null, teacher_name: '', schedule: '', notes: '' });
+    renderReport(false);
 }
 
 function deletePlanRow(i) {
     const plan = state.content.plan = Array.isArray(state.content.plan) ? state.content.plan : [];
     if (!plan.length) return;
     plan.splice(i, 1);
-    renderReport();
+    renderReport(false);
 }
 
 function collectPlanRows() {
@@ -450,7 +451,7 @@ function doRegenerate(sectionKey, label) {
                 if (!res.success) throw new Error(res.error);
                 state.report = res.data;
                 state.content = safeParse(res.data.content_json, { chapters: [] });
-                renderReport();
+                renderReport(false);
                 showToast(`「${label}」已重新生成`, 'success');
             } catch (e) {
                 showToast('重新生成失败：' + e.message, 'error');
@@ -467,7 +468,6 @@ function regenerateSection(i) {
 }
 function regenerateSummary() { doRegenerate('summary', '方法总纲'); }
 function regenerateConclusion() { doRegenerate('conclusion', '写在最后'); }
-function regeneratePlan() { doRegenerate('plan', '课程规划'); }
 
 function regenerateAll() {
     doRegenerate('', '整份计划');
@@ -494,7 +494,7 @@ async function persistReport(extraPayload, planRows, planReason) {
         const res = await API.reports.update(reportId, payload);
         if (!res.success) throw new Error(res.error);
         state.report = res.data;
-        renderReport();
+        renderReport(false);
         showToast('已保存', 'success');
     } catch (e) {
         showToast('保存失败：' + e.message, 'error');
@@ -503,18 +503,31 @@ async function persistReport(extraPayload, planRows, planReason) {
     }
 }
 
-async function togglePublish() {
-    if (state.busy) return;
-    const next = state.report.status === 'published' ? 'draft' : 'published';
-    try {
-        const res = await API.reports.update(reportId, { status: next });
-        if (!res.success) throw new Error(res.error);
-        state.report = res.data;
-        renderReport();
-        showToast(next === 'published' ? '计划已发布' : '已取消发布', 'success');
-    } catch (e) {
-        showToast('操作失败：' + e.message, 'error');
-    }
+function deleteReport() {
+    Utils.confirmDialog({
+        title: '删除报告',
+        danger: true,
+        message: '确定删除该报告？删除后不可恢复，但课程规划版本历史会保留。',
+        onOk: async () => {
+            if (state.busy) return;
+            state.busy = true;
+            try {
+                const res = await API.reports.delete(reportId);
+                if (!res.success) throw new Error(res.error);
+                showToast('报告已删除', 'success');
+                // 跳回学科详情
+                if (state.studentId && state.subjectId) {
+                    location.hash = `#/student/${state.studentId}/subject/${state.subjectId}`;
+                } else {
+                    location.hash = '#/students';
+                }
+            } catch (e) {
+                showToast('删除失败：' + e.message, 'error');
+            } finally {
+                state.busy = false;
+            }
+        },
+    });
 }
 
 /* ---------- 规划版本 ---------- */
@@ -597,13 +610,18 @@ function renderKbReferences(kbJson) {
         </div>`;
 }
 
-/* ---------- 导出 Word / 打印 ---------- */
+/* ---------- 导出 Word ---------- */
 async function exportDocx() {
     if (state.busy) return;
     state.busy = true;
     showToast('正在生成 Word 文档...', 'info');
     try {
-        const resp = await fetch(`/api/reports/${reportId}/docx`);
+        // 把当前编辑后的 content_json 传给后端，确保导出的是编辑过后内容
+        const resp = await fetch(`/api/reports/${reportId}/docx`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content_json: JSON.stringify(state.content) }),
+        });
         if (!resp.ok) {
             let msg = '导出失败';
             try { msg = (await resp.json()).detail || msg; } catch (e) { /* ignore */ }
@@ -642,8 +660,8 @@ loadReport();
 /* ---------- IIFE 作用域导出：供内联 onclick 调用 ---------- */
 Object.assign(window, {
     goBack, loadReport, editTitle, regenerateAll, showPlanVersions,
-    exportDocx, togglePublish, editSection, regenerateSection,
-    editSummary, regenerateSummary, editConclusion, regenerateConclusion, regeneratePlan,
+    exportDocx, deleteReport, editSection, regenerateSection,
+    editSummary, regenerateSummary, editConclusion, regenerateConclusion,
     addPlanRow, savePlan, deletePlanRow, previewPlanVersion, assignTeacherAll,
 });
 })();

@@ -24,6 +24,7 @@ from backend.models.ai_conversation import AIConversation
 from backend.models.course_plan import CoursePlan
 from backend.models.knowledge_doc import KnowledgeDoc
 from backend.models.report import Report
+from backend.models.setting import Setting
 from backend.models.student import Student
 from backend.models.subject import Subject
 from backend.services.conversation_service import SUMMARY_PREFIX, _extract_json
@@ -166,6 +167,28 @@ def _retrieve_kb_context(db: Session, query: str):
 
 
 
+def _org_defaults(db: Session) -> dict:
+    """读取机构默认设置（settings 表 org_defaults），缺失时返回默认值。
+
+    默认：每节课 1.5 小时，寒暑假每周上 6 天课、周日放假。
+    供报告生成/课程规划/规划调整的 prompt 注入约束。
+    """
+    defaults = {"lesson_hours": 1.5, "weekly_days": 6, "off_day": "周日"}
+    setting = db.query(Setting).filter(Setting.key == "org_defaults").first()
+    if not setting or not setting.value_json:
+        return defaults
+    try:
+        data = json.loads(setting.value_json)
+    except (json.JSONDecodeError, TypeError):
+        return defaults
+    if not isinstance(data, dict):
+        return defaults
+    for k, v in defaults.items():
+        if k in data and data[k] not in (None, ""):
+            defaults[k] = data[k]
+    return defaults
+
+
 def _parse_plan(plan) -> list:
     """清洗课程规划行：字段齐全、teacher_id 归一化、截断上限"""
     if not isinstance(plan, list):
@@ -260,7 +283,11 @@ def _parse_regenerate_output(text: str, section: str) -> dict:
     if prefix in CHAPTER_PREFIXES:
         for ch in data.get("chapters") or []:
             if isinstance(ch, dict) and str(ch.get("title") or "")[:2] == prefix:
-                return {"chapters": [ch]}
+                result = {"chapters": [ch]}
+                # 六、本学科落地规划：章节文字 + 课程规划表格一起更新
+                if prefix == "六、":
+                    result["plan"] = _parse_plan(data.get("plan"))
+                return result
         raise HTTPException(status_code=502, detail=f"AI 未返回「{section}」，请重新生成")
     raise HTTPException(status_code=400, detail=f"无效分节：{section}")
 
@@ -310,6 +337,7 @@ def generate_report(db: Session, subject_id: int, data: dict = None) -> dict:
     kb_context, kb_refs = _retrieve_kb_context(
         db, f"学生{student.name} 学科{subject.name} 学习计划")
 
+    od = _org_defaults(db)
     prompt = render_prompt(
         "report_generation.txt",
         student_name=student.name,
@@ -317,6 +345,9 @@ def generate_report(db: Session, subject_id: int, data: dict = None) -> dict:
         student_info=_build_student_info(student),
         conversation_summary=summary,
         kb_context=kb_context,  # StrictUndefined：未就绪也必须传空串
+        lesson_hours=od["lesson_hours"],
+        weekly_days=od["weekly_days"],
+        off_day=od["off_day"],
     )
     text = _call_llm(prompt)
     parsed = _parse_report_output(text)
@@ -366,11 +397,15 @@ def regenerate_report(db: Session, report_id: int, data: dict = None) -> dict:
             raise HTTPException(status_code=400, detail="旧版报告，请先重新生成整份报告")
         original = {}
 
+    od = _org_defaults(db)
     prompt = render_prompt(
         "report_regenerate.txt",
         original_content=_dump(original),
         extra_info=extra_info,  # StrictUndefined：缺省传空串
         section=section,
+        lesson_hours=od["lesson_hours"],
+        weekly_days=od["weekly_days"],
+        off_day=od["off_day"],
     )
     text = _call_llm(prompt)
     parsed = _parse_regenerate_output(text, section)
@@ -399,6 +434,14 @@ def regenerate_report(db: Session, report_id: int, data: dict = None) -> dict:
             if not replaced:
                 chapters.append(new_ch)
             original["chapters"] = chapters
+            # 六、本学科落地规划：章节重生成时同步更新课程规划表格并新建版本
+            # 仅当 AI 确实返回了非空 plan 时才更新表格，避免把已有表格清空
+            if prefix == "六、" and "plan" in parsed and parsed["plan"]:
+                plan_rows = parsed["plan"]
+                original["plan"] = plan_rows
+                plan = _create_course_plan(db, report.subject_id, plan_rows)
+                if plan:
+                    report.course_plan_id = plan.id
         content_json = original
     else:
         parsed_full = _parse_report_output(text)

@@ -115,6 +115,31 @@
                         <label class="settings-label">联系电话</label>
                         <input type="text" id="org-phone" class="w-full" placeholder="如：010-88888888">
                     </div>
+                    <div class="pt-2 border-t" style="border-color:#f1f5f9;">
+                        <div class="settings-label">📅 课程默认（用于报告/规划生成）</div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <label class="settings-label">每节课时长(小时)</label>
+                            <input type="number" id="org-lesson-hours" class="w-full" min="0.5" max="4" step="0.5" placeholder="1.5">
+                        </div>
+                        <div>
+                            <label class="settings-label">寒暑假每周上课天数</label>
+                            <input type="number" id="org-weekly-days" class="w-full" min="1" max="7" step="1" placeholder="6">
+                        </div>
+                        <div>
+                            <label class="settings-label">休息日</label>
+                            <select id="org-off-day" class="w-full">
+                                <option value="周日">周日</option>
+                                <option value="周六">周六</option>
+                                <option value="周一">周一</option>
+                                <option value="周二">周二</option>
+                                <option value="周三">周三</option>
+                                <option value="周四">周四</option>
+                                <option value="周五">周五</option>
+                            </select>
+                        </div>
+                    </div>
                     <div>
                         <label class="settings-label">Logo</label>
                         <div class="flex items-center gap-3">
@@ -380,6 +405,11 @@ async function loadOrg() {
         document.getElementById('org-phone').value = org.phone || '';
         orgLogoData = org.logo || '';
         updateOrgPreview();
+        // 课程默认设置
+        const od = (r.success && r.data.org_defaults) || {};
+        document.getElementById('org-lesson-hours').value = od.lesson_hours || 1.5;
+        document.getElementById('org-weekly-days').value = od.weekly_days || 6;
+        document.getElementById('org-off-day').value = od.off_day || '周日';
     } catch (e) { console.error('加载机构信息失败', e); }
 }
 
@@ -431,8 +461,14 @@ async function saveOrg() {
         logo: orgLogoData,
     };
     if (!data.name) { showToast('请填写机构名称', 'error'); return; }
+    // 课程默认设置
+    const od = {
+        lesson_hours: parseFloat(document.getElementById('org-lesson-hours').value) || 1.5,
+        weekly_days: parseInt(document.getElementById('org-weekly-days').value, 10) || 6,
+        off_day: document.getElementById('org-off-day').value || '周日',
+    };
     try {
-        const r = await API.settings.update({ org_name: data });
+        const r = await API.settings.update({ org_name: data, org_defaults: od });
         if (r.success) {
             // 同步侧边栏机构名
             try { store.orgName = data.name; document.getElementById('navbar-org-name').textContent = data.name; } catch (e) {}

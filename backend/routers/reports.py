@@ -77,6 +77,18 @@ def regenerate_report(report_id: int, data: dict = None, db: Session = Depends(g
     return success_response(report)
 
 
+@router.delete("/reports/{report_id}")
+def delete_report(report_id: int, db: Session = Depends(get_db)):
+    """删除报告。course_plan 为独立版本化实体，不级联删除（删报告不影响规划版本历史）"""
+    report = db.query(Report).filter(Report.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="报告不存在")
+    log_activity(db, "删除报告", f"报告「{report.title}」", subject_id=report.subject_id)
+    db.delete(report)
+    db.commit()
+    return success_response({"deleted": True})
+
+
 @router.get("/reports/{report_id}/pdf")
 def export_pdf(report_id: int, db: Session = Depends(get_db)):
     """导出数据装配：报告 + 学科 + 学生 + 机构名（PDF 由前端 jsPDF + html2canvas 渲染）"""
@@ -106,15 +118,30 @@ def export_pdf(report_id: int, db: Session = Depends(get_db)):
     })
 
 
-@router.get("/reports/{report_id}/docx")
-def export_docx(report_id: int, db: Session = Depends(get_db)):
-    """导出 Word（docx）：按机构模板排版生成单科学习计划，浏览器下载"""
+@router.post("/reports/{report_id}/docx")
+def export_docx(report_id: int, data: dict = None, db: Session = Depends(get_db)):
+    """导出 Word（docx）：按机构模板排版生成单科学习计划，浏览器下载
+
+    body 可选：{content_json: "..."} —— 前端把当前编辑后的 content_json 传过来，
+    确保导出的 Word 始终是「编辑过后」的内容（即使未点保存规划）；
+    未传则回退到 DB 最后保存的 content_json。
+    """
     report = db.query(Report).filter(Report.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="报告不存在")
     subject = db.get(Subject, report.subject_id)
     student = db.get(Student, subject.student_id) if subject else None
-    buf = build_report_docx(report, subject, student)
+    org = db.query(Setting).filter(Setting.key == "org_name").first()
+    org_name = ""
+    if org and org.value_json:
+        try:
+            import json as _json
+            parsed = _json.loads(org.value_json)
+            if isinstance(parsed, dict):
+                org_name = str(parsed.get("name") or "")
+        except Exception:
+            org_name = ""
+    buf = build_report_docx(report, subject, student, org_name=org_name, content_json_override=(data or {}).get("content_json"))
     fname = f"{student.name if student else '学生'}-{subject.name if subject else ''}-冲刺学习计划.docx"
     return Response(
         content=buf.getvalue(),

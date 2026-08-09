@@ -41,6 +41,7 @@ window.API = {
         update(id, data) { return API.put(`/api/students/${id}`, data); },
         delete(id)   { return API.delete(`/api/students/${id}`); },
         updateStatus(id, status) { return API.put(`/api/students/${id}/status`, { status }); },
+        chat(id, messages) { return API.post(`/api/students/${id}/chat`, { messages }); },
     },
 
     // === 学科 ===
@@ -67,6 +68,7 @@ window.API = {
         get(id) { return API.get(`/api/reports/${id}`); },
         update(id, data) { return API.put(`/api/reports/${id}`, data); },
         regenerate(id, data) { return API.post(`/api/reports/${id}/regenerate`, data || {}); },
+        delete(id) { return API.delete(`/api/reports/${id}`); },
         pdf(id) { return API.get(`/api/reports/${id}/pdf`); },
     },
 

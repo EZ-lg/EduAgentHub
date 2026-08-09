@@ -49,6 +49,8 @@ const state = {
     sending: false,
     subjectName: '',
     studentId: null,
+    // 结束建议条是否已出现过（一旦出现过就保持显示，用户补充信息时不再消失）
+    endSuggestedOnce: false,
 };
 
 /* ---------- 渲染 ---------- */
@@ -103,11 +105,21 @@ function setTyping(on) {
 }
 
 function showEndSuggest() {
+    state.endSuggestedOnce = true;
     document.getElementById('conv-end-suggest').classList.remove('hidden');
 }
 
 function hideEndSuggest() {
+    // 结束建议条一旦出现过就保持显示，仅真正结束时才隐藏
+    if (state.endSuggestedOnce) return;
     document.getElementById('conv-end-suggest').classList.add('hidden');
+}
+
+// 历史中是否已出现收尾语（AI 判定过信息足够）——刷新后恢复建议条
+function historyHasClosing() {
+    return state.messages.some(m =>
+        (m.role === 'ai') &&
+        /信息差不多了|还有什么要补充/.test(m.content || ''));
 }
 
 function showRetryBanner() {
@@ -275,6 +287,8 @@ async function initConversationPage() {
         renderMessages();
         document.getElementById('conv-subtitle').textContent =
             d.configured ? `${d.student_name || ''} · 进行中` : 'AI 服务未配置';
+        // 恢复进行中会话时，历史已收尾则重新显示结束建议条
+        if (historyHasClosing()) showEndSuggest();
         if (!d.configured) showUnconfiguredBanner();
         if (d.first_question_failed) showRetryBanner();
     } catch (e) {
@@ -300,8 +314,8 @@ window.currentPageRefresh = async () => {
         state.configured = d.configured;
         renderMessages();
         document.getElementById('conv-input').value = val;
-        // 刷新后重置横幅/建议条，避免残留过期状态
-        hideEndSuggest();
+        // 刷新后根据历史恢复结束建议条（历史已收尾则保持显示），避免残留过期状态
+        if (historyHasClosing()) showEndSuggest(); else hideEndSuggest();
         if (!d.configured) showUnconfiguredBanner();
         if (d.first_question_failed) showRetryBanner(); else hideRetryBanner();
     } catch (e) { /* 静默，保持当前视图 */ }

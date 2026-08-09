@@ -201,13 +201,22 @@ def analyze_scores(db: Session, subject_id: int) -> dict:
 
 
 def adjust_plan_preview(db: Session, subject_id: int) -> dict:
-    """AI 课程调整建议（预览，不落库）：成绩分析 + 当前规划 → 调整后规划 + 原因"""
+    """AI 课程调整建议（预览，不落库）：成绩分析 + 当前规划 → 调整后规划 + 原因
+
+    无成绩时不再抛错：score_analysis 传占位串，AI 主要依据现有规划结构优化。
+    """
     subject = _get_subject(db, subject_id)
     student = db.get(Student, subject.student_id)
 
-    # 成绩分析（内部会校验有成绩，无则抛 400）
-    result = analyze_scores(db, subject_id)
-    analysis = result["analysis"]
+    # 成绩分析：有成绩则分析；无成绩降级为占位（允许无成绩调整）
+    analysis = None
+    score_analysis_text = "（暂无成绩数据，本次调整主要依据现有课程规划结构优化，不涉及具体成绩）"
+    try:
+        result = analyze_scores(db, subject_id)
+        analysis = result["analysis"]
+        score_analysis_text = _analysis_to_text(analysis)
+    except HTTPException:
+        pass  # 无成绩等 → 降级
 
     plan = _active_plan(db, subject_id)
     if not plan:
@@ -222,13 +231,17 @@ def adjust_plan_preview(db: Session, subject_id: int) -> dict:
     kb_context, _ = report_generator._retrieve_kb_context(
         db, f"学生{student.name if student else ''} 学科{subject.name} 课程规划调整")
 
+    od = report_generator._org_defaults(db)
     prompt = render_prompt(
         "plan_adjustment.txt",
         student_name=student.name if student else "该生",
         subject_name=subject.name,
         current_plan=json.dumps(current_rows, ensure_ascii=False),
-        score_analysis=_analysis_to_text(analysis),
+        score_analysis=score_analysis_text,
         kb_context=kb_context,
+        lesson_hours=od["lesson_hours"],
+        weekly_days=od["weekly_days"],
+        off_day=od["off_day"],
     )
     text = report_generator._call_llm(prompt, PLAN_ADJUST_TEMPERATURE)
     data = _extract_json(text)

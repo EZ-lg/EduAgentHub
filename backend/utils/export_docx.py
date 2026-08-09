@@ -91,10 +91,15 @@ def _add_plan_table(doc, plan_rows):
     return table
 
 
-def build_report_docx(report, subject=None, student=None, org_name=''):
-    """根据 Report 生成单科学习计划 docx，返回 BytesIO"""
+def build_report_docx(report, subject=None, student=None, org_name='', content_json_override=None):
+    """根据 Report 生成单科学习计划 docx，返回 BytesIO
+
+    content_json_override：若传入（前端编辑后的 JSON 字符串），优先使用它，
+    确保导出的是编辑过后内容，而非 DB 旧数据。
+    """
+    raw = content_json_override if isinstance(content_json_override, str) and content_json_override.strip() else report.content_json
     try:
-        content = json.loads(report.content_json or '{}')
+        content = json.loads(raw or '{}')
     except (json.JSONDecodeError, TypeError):
         content = {}
     if not isinstance(content, dict):
@@ -106,6 +111,11 @@ def build_report_docx(report, subject=None, student=None, org_name=''):
     normal = doc.styles['Normal']
     normal.font.name = '宋体'
     normal.font.size = Pt(11)
+
+    # 机构抬头（org_name 非空时显示，位于主标题上方）
+    if org_name:
+        _add_para(doc, org_name, name='微软雅黑', size=14, color=DARK_BLUE, bold=True,
+                  align=WD_ALIGN_PARAGRAPH.CENTER, space_after=2, line_spacing=1.2)
 
     # 主标题（优先 content.title，带「·」样式）
     title = content.get('title') or report.title or '学习计划'

@@ -81,6 +81,42 @@ def _display_history(msgs: list) -> list:
     return result
 
 
+def _asked_questions(msgs: list) -> list:
+    """提取 AI 已问过的问题清单（供 prompt 去重）。取 AI 消息中含问号的提问，去尾语去重"""
+    closing_markers = ("信息差不多了", "还有什么要补充", "【学情总结】")
+    questions = []
+    for m in msgs:
+        if m.get("role") not in ("ai", "assistant"):
+            continue
+        content = str(m.get("content") or "").strip()
+        if not content or any(mk in content for mk in closing_markers):
+            continue
+        if "？" in content or "?" in content or "吗" in content or "呢" in content:
+            questions.append(content)
+    # 去重（同一条只留一次），最多给最近 12 条，避免 prompt 过长
+    seen, out = set(), []
+    for q in reversed(questions):
+        key = q[:40]
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(q)
+        if len(out) >= 12:
+            break
+    return list(reversed(out))
+
+
+def _is_closed_already(msgs: list) -> bool:
+    """历史中是否已出现收尾语（AI 判定过信息足够）。用于补充信息时保持收尾状态"""
+    for m in msgs:
+        if m.get("role") not in ("ai", "assistant"):
+            continue
+        content = str(m.get("content") or "")
+        if "信息差不多了" in content or "还有什么要补充" in content:
+            return True
+    return False
+
+
 def _subjects_info(db: Session, subject: Subject) -> str:
     """该学生其他活跃学科名（逗号分隔），用于让 AI 只围绕当前学科提问"""
     others = db.query(Subject).filter(
@@ -148,6 +184,8 @@ def _run_turn(db: Session, conv: AIConversation, subject: Subject, student: Stud
         subject_name=subject.name,
         history=_display_history(msgs),
         subjects_info=_subjects_info(db, subject),
+        asked_questions=_asked_questions(msgs),
+        closed_already=_is_closed_already(msgs),
     )
     reply, enough = _parse_reply(_call_llm([
         {"role": "system", "content": system},
