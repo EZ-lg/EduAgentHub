@@ -9,6 +9,9 @@ import time
 import uvicorn
 
 from config import DEFAULT_PORT, HOST
+# 强制导入 backend.app，确保 PyInstaller 收集整个 backend 包
+# （下方 uvicorn.run 的 "backend.app:app" 是字符串，静态分析无法识别该依赖，不 import 打包后会缺 backend）
+from backend.app import app  # noqa: F401
 
 
 def find_free_port(start: int = DEFAULT_PORT) -> int:

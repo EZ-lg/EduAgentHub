@@ -6,16 +6,19 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 dist/
-build/
+build/*
 !build/tailwind-input.css
+!build/build.spec
 !build_tailwind.py
 *.spec
+!build/build.spec
 venv/
 .venv/
 
 # 运行时数据（不提交）
 data/tutoring.db
 data/chroma_data/
+data/backups/
 data/uploads/*
 data/exports/*
 !data/uploads/.gitkeep
