@@ -2,11 +2,21 @@
 教培智能体 - 入口文件
 启动 FastAPI 服务 + 自动打开浏览器
 """
+import os
+import sys
 import webbrowser
 import threading
 import socket
 import time
 import uvicorn
+
+# PyInstaller windowed 模式（console=False，无黑窗）下 sys.stdout/sys.stderr 为 None，
+# uvicorn 配置日志时访问 sys.stdout.isatty() 会抛 AttributeError 导致启动崩溃。
+# 替换为 devnull 流，日志静默丢弃（windowed 应用没有控制台可写）。
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, 'w', encoding='utf-8')
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, 'w', encoding='utf-8')
 
 from config import DEFAULT_PORT, HOST
 # 强制导入 backend.app，确保 PyInstaller 收集整个 backend 包
