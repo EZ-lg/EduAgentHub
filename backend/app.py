@@ -63,10 +63,15 @@ def create_app() -> FastAPI:
     if frontend_path.exists():
         app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
 
-    # 启动时初始化数据库
+    # 启动时初始化数据库 + 自动备份（数据安全：保留最近 N 份，防止误删不可恢复）
     @app.on_event("startup")
     async def startup():
         init_db()
+        from backend.utils.backup import backup_database  # 延迟导入避免循环
+        try:
+            backup_database()
+        except Exception:
+            pass  # 备份失败不阻塞启动
 
     return app
 

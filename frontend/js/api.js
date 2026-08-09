@@ -148,6 +148,8 @@ window.API = {
         update(data) { return API.put('/api/settings', data); },
         testLLM(data) { return API.post('/api/settings/test-llm', data || {}); },
         testEmbed(data) { return API.post('/api/settings/test-embed', data || {}); },
+        backup() { return API.post('/api/settings/backup'); },
+        backupsList() { return API.get('/api/settings/backups'); },
     },
 
     // === 工作台 ===

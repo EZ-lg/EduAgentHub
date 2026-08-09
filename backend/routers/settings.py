@@ -9,13 +9,14 @@
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.ai.factory import create_provider, get_provider_meta
 from backend.ai.manager import ai_manager, LLM_CONFIG_KEY, EMBEDDING_CONFIG_KEY
 from backend.models import get_db
 from backend.models.setting import Setting
+from backend.utils.backup import backup_database, list_backups
 from backend.utils.helpers import success_response, now_iso
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -101,3 +102,19 @@ def test_embed(data: dict = None, db: Session = Depends(get_db)):
     """测试 Embedding 连接。同上"""
     config = data if (data and data.get("provider")) else _read_saved(db, EMBEDDING_CONFIG_KEY)
     return _run_test(config, mode="embed", kind="Embedding")
+
+
+@router.post("/backup")
+def backup_now():
+    """立即备份数据库（数据管理）"""
+    path = backup_database()
+    if not path:
+        raise HTTPException(status_code=500, detail="备份失败，请检查 data 目录权限")
+    import os
+    return success_response({"path": path, "size": os.path.getsize(path) if os.path.exists(path) else 0})
+
+
+@router.get("/backups")
+def backups_list():
+    """列出全部备份（数据管理）"""
+    return success_response(list_backups())

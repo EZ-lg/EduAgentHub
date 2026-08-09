@@ -173,11 +173,19 @@
     <!-- ============ 数据管理 ============ -->
     <div id="settings-tab-data" class="settings-tab-panel hidden">
         <div class="panel">
-            <div class="panel-title"><svg class="icon"><use href="#icon-database"/></svg> 数据管理</div>
-            <div class="empty-state py-6">
-                <div class="empty-icon"><svg class="icon"><use href="#icon-database"/></svg></div>
-                <div class="empty-title">此模块将在后续阶段实现</div>
-                <div class="empty-desc">备份数据库 / 恢复数据库 / 清空数据</div>
+            <div class="panel-title"><svg class="icon"><use href="#icon-database"/></svg> 数据管理 <span class="text-xs font-normal text-gray-400">数据库自动备份</span></div>
+            <div class="mb-4 p-3 rounded-lg text-xs bg-indigo-50 text-indigo-600 border border-indigo-100 inline-flex items-start gap-1.5">
+                <svg class="icon icon--sm flex-shrink-0 mt-0.5"><use href="#icon-shield-check"/></svg>
+                每次启动时自动备份数据库（保留最近 14 份），防止误删不可恢复。
+            </div>
+            <div class="flex items-center gap-2 mb-3">
+                <button onclick="backupNow()" class="btn-primary" style="padding:6px 16px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-save"/></svg> 立即备份</button>
+                <button onclick="loadBackups()" class="btn-outline" style="padding:6px 16px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-refresh-cw"/></svg> 刷新</button>
+            </div>
+            <div id="backup-list" class="text-center py-8 text-gray-300 text-sm">加载中...</div>
+            <div class="text-xs text-gray-300 mt-3 leading-relaxed">
+                备份文件保存在 <code class="text-gray-400">data/backups/</code> 目录。<br>
+                如需恢复：关闭程序 → 用备份文件替换 <code class="text-gray-400">data/tutoring.db</code> → 重新启动。
             </div>
         </div>
     </div>
@@ -241,6 +249,7 @@ async function initSettings() {
         const el = document.getElementById(id);
         if (el) el.addEventListener('input', updateOrgPreview);
     });
+    loadBackups();
 }
 
 async function loadSavedConfig() {
@@ -479,6 +488,36 @@ async function saveOrg() {
     } catch (e) { showToast('保存失败：' + e.message, 'error'); }
 }
 
+/* ---------- 数据备份 ---------- */
+async function loadBackups() {
+    const box = document.getElementById('backup-list');
+    if (!box) return;
+    box.innerHTML = '<div class="text-gray-300 text-sm">加载中...</div>';
+    try {
+        const r = await API.settings.backupsList();
+        const list = (r.success && r.data) ? r.data : [];
+        if (!list.length) {
+            box.innerHTML = '<div class="text-gray-300 text-sm">暂无备份（每次启动自动生成）</div>';
+            return;
+        }
+        box.innerHTML = `<div class="divide-y" style="border-color:#f1f5f9;">` + list.map(b => `
+            <div class="flex items-center justify-between py-2">
+                <span class="text-sm text-gray-700 num">${Utils.escapeHtml(b.filename)}</span>
+                <span class="text-xs text-gray-400 num">${(b.size / 1024).toFixed(0)} KB · ${b.created_at}</span>
+            </div>`).join('') + `</div>`;
+    } catch (e) {
+        box.innerHTML = `<div class="text-red-400 text-sm">加载失败：${Utils.escapeHtml(e.message)}</div>`;
+    }
+}
+
+async function backupNow() {
+    try {
+        const r = await API.settings.backup();
+        if (r.success) { showToast('备份完成', 'success'); loadBackups(); }
+        else showToast('备份失败：' + (r.error || ''), 'error');
+    } catch (e) { showToast('备份失败：' + e.message, 'error'); }
+}
+
 /* ---------- 工具 ---------- */
 function switchSettingsTab(name) {
     document.querySelectorAll('.settings-tab').forEach(b => {
@@ -503,6 +542,7 @@ Object.assign(window, {
     saveLLM, saveEmbed, testLLM, testEmbed,
     switchSettingsTab, toggleKey, onLLMProviderChange, onEmbProviderChange,
     saveOrg, handleOrgLogo, clearOrgLogo, loadOrg,
+    loadBackups, backupNow,
 });
 })();
 </script>
