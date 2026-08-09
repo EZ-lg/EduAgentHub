@@ -1,0 +1,8 @@
+/*
+  Tailwind 编译入口（不要直接引入页面）
+  由 build_tailwind.py 处理：扫描 frontend 下所有 html/js 文件，
+  输出压缩后的 frontend/vendor/tailwind.css
+*/
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
