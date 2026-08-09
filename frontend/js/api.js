@@ -108,14 +108,34 @@ window.API = {
 
     // === 知识库 ===
     knowledgeBase: (() => {
-        // /api/knowledge-docs 和 /api/knowledge/qa 两个前缀
+        // /api/knowledge-docs（管理）和 /api/knowledge（问答）两个前缀
         return {
             list(category = '') { return API.get(`/api/knowledge-docs?category=${category}`); },
             get(id) { return API.get(`/api/knowledge-docs/${id}`); },
             delete(id) { return API.delete(`/api/knowledge-docs/${id}`); },
             toggleStatus(id, status) { return API.put(`/api/knowledge-docs/${id}/status`, { status }); },
+            // 文件上传走 FormData，不能带 JSON Content-Type；auto_category 由 AI 自动判断分类
+            upload(category, title, file, autoCategory = false) {
+                const fd = new FormData();
+                fd.append('category', category || '其他');
+                fd.append('title', title || '');
+                fd.append('auto_category', autoCategory ? 'true' : 'false');
+                fd.append('file', file);
+                return fetch('/api/knowledge-docs/upload', { method: 'POST', body: fd })
+                    .then(r => r.json().then(json => ({ ok: r.ok, json })))
+                    .then(({ ok, json }) => {
+                        if (!ok) throw new Error(json.detail || json.error || '上传失败');
+                        return json;
+                    });
+            },
+            preview(id) { return API.get(`/api/knowledge-docs/${id}/preview`); },
+            reparse(id) { return API.post(`/api/knowledge-docs/${id}/reparse`, {}); },
+            search(data) { return API.post('/api/knowledge-docs/search', data); },
+            rebuild() { return API.post('/api/knowledge-docs/rebuild', {}); },
             qa(question) { return API.post('/api/knowledge/qa', { question }); },
             presets() { return API.get('/api/knowledge/qa/presets'); },
+            qaHistory() { return API.get('/api/knowledge/qa/history'); },
+            clearHistory() { return API.delete('/api/knowledge/qa/history'); },
         };
     })(),
 

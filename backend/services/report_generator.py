@@ -141,16 +141,28 @@ def _build_student_info(student: Student) -> str:
 def _retrieve_kb_context(db: Session, query: str):
     """RAG 检索（优雅降级）。
 
-    P5 阶段 ChromaDB 未接入（P8 实现）：
-    - embedding 未配置 / 无 active 知识文档 / 基础设施未就绪 → 一律返回 ("", [])
-    - P8 时替换此函数为真实向量检索（签名不变，返回 (context_text, [{"title","category","snippet"}])）
+    P8 已接入真实向量检索：
+    - embedding 未配置 / 无 active 知识文档 / 检索异常 → 一律返回 ("", [])，报告照常生成
+    - 正常：返回 (context_text, [{"title","category","snippet"}])，签名不变
     """
+    from backend.services import kb_service  # 延迟导入避免循环依赖
+
     embedding_ok = ai_manager.get_embedding() is not None
     doc_count = db.query(KnowledgeDoc).filter(KnowledgeDoc.status == "active").count()
     if not embedding_ok or doc_count == 0:
         return "", []
-    # TODO(P8): ChromaDB 向量检索 Top-5 → 拼 context_text + kb_references
-    return "", []
+    try:
+        results = kb_service.search(db, query, top_k=5)
+    except Exception:
+        return "", []
+    if not results:
+        return "", []
+    context_text = kb_service.build_kb_context(results)
+    references = [
+        {"title": r["title"], "category": r["category"], "snippet": r["snippet"]}
+        for r in results
+    ]
+    return context_text, references
 
 
 

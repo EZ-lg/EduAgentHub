@@ -54,6 +54,7 @@ def create_app() -> FastAPI:
     app.include_router(communication_logs.router)
     app.include_router(teachers.router)
     app.include_router(knowledge_base.router)
+    app.include_router(knowledge_base.qa_router)
     app.include_router(settings.router)
     app.include_router(dashboard.router)
 

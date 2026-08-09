@@ -1,7 +1,7 @@
 """
 数据库初始化与 Session 管理
 """
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
@@ -29,7 +29,7 @@ class Base(DeclarativeBase):
 
 
 def init_db():
-    """创建所有表"""
+    """创建所有表 + 轻量列迁移（SQLite create_all 不会为已有表加新列）"""
     from backend.models.student import Student
     from backend.models.subject import Subject
     from backend.models.ai_conversation import AIConversation
@@ -39,9 +39,28 @@ def init_db():
     from backend.models.communication_log import CommunicationLog
     from backend.models.teacher import Teacher
     from backend.models.knowledge_doc import KnowledgeDoc
+    from backend.models.qa_history import QaHistory
     from backend.models.setting import Setting
     from backend.models.activity_log import ActivityLog
     Base.metadata.create_all(bind=engine)
+    _migrate()
+
+
+def _migrate():
+    """为已存在的表补齐新列（P8 加分项：knowledge_docs 异步入库状态）"""
+    insp = inspect(engine)
+    if "knowledge_docs" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("knowledge_docs")}
+    adds = []
+    if "index_status" not in cols:
+        adds.append("ALTER TABLE knowledge_docs ADD COLUMN index_status VARCHAR DEFAULT 'done'")
+    if "index_error" not in cols:
+        adds.append("ALTER TABLE knowledge_docs ADD COLUMN index_error VARCHAR DEFAULT ''")
+    if adds:
+        with engine.begin() as conn:
+            for stmt in adds:
+                conn.execute(text(stmt))
 
 
 def get_db():

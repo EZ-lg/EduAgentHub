@@ -1,9 +1,427 @@
-<!-- 知识库管理页 -->
+<!-- 知识库管理页 — P8：上传/切片入库 + 分类管理 + 启用停用 + 预览 + 重新解析 + 检索测试 -->
 <div class="fade-in">
-    <div class="text-center py-12 text-gray-400">
-        <div class="text-4xl mb-4">📚</div>
-        <p class="text-lg mb-2">知识库管理</p>
-        <p class="text-sm">此功能将在 P8 阶段实现</p>
-        <p class="text-xs text-gray-300 mt-4">文档上传 + 自动切片入库 + 分类管理 + 检索测试</p>
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div class="flex items-center gap-3">
+            <h2 class="text-sm font-semibold text-gray-700">知识库文档 <span class="text-xs text-gray-400 font-normal" id="kb-count"></span></h2>
+            <button onclick="goToQA()" class="text-xs text-blue-500 hover:text-blue-700 transition" title="基于知识库智能问答">
+                🤖 智能问答 →
+            </button>
+        </div>
+        <div class="flex gap-2 items-center">
+            <select id="kb-category" onchange="changeCategory(this.value)"
+                    class="text-sm border rounded-lg px-2.5 py-1.5" style="border-color:#e2e8f0;">
+                <option value="">全部分类</option>
+                <option value="课程体系">课程体系</option>
+                <option value="师资">师资</option>
+                <option value="收费">收费</option>
+                <option value="案例">案例</option>
+                <option value="机构">机构</option>
+                <option value="政策">政策</option>
+                <option value="其他">其他</option>
+            </select>
+            <button onclick="openSearchModal()" class="btn-outline" style="padding:6px 16px;font-size:13px;">🔍 检索测试</button>
+            <button onclick="openUploadModal()" class="btn-primary" style="padding:6px 16px;font-size:13px;">➕ 上传文档</button>
+            <button onclick="rebuildKb()" class="text-xs text-gray-400 hover:text-blue-500 transition" title="清空全部向量，按现有已启用文档重新入库（切换 Embedding 模型后使用）">↻ 重建</button>
+        </div>
+    </div>
+
+    <div id="kb-embed-warning" class="hidden mb-3 p-3 rounded-lg text-xs bg-yellow-50 border" style="border-color:#fde68a;color:#92400e;"></div>
+
+    <div class="panel">
+        <div class="text-center py-10 text-gray-300" id="kb-loading">加载中...</div>
+        <table class="w-full text-sm hidden" id="kb-table">
+            <thead>
+                <tr>
+                    <th style="width:220px;">标题</th>
+                    <th style="width:90px;">分类</th>
+                    <th style="width:70px;">类型</th>
+                    <th style="width:70px;">切片</th>
+                    <th style="width:90px;">状态</th>
+                    <th style="width:110px;">上传时间</th>
+                    <th style="width:150px;">操作</th>
+                </tr>
+            </thead>
+            <tbody id="kb-tbody"></tbody>
+        </table>
+        <div class="text-center py-12 text-gray-400 hidden" id="kb-empty">
+            <div class="text-4xl mb-3">📚</div>
+            <div class="text-sm mb-1">知识库暂无文档</div>
+            <div class="text-xs text-gray-300">点击右上角「➕ 上传文档」上传 PDF / Word / TXT / Markdown，自动切片入库，供报告生成与智能问答引用</div>
+        </div>
     </div>
 </div>
+
+<script>
+(function () {
+/* ---------- 常量 ---------- */
+const EXT_LABEL = { pdf: 'PDF', docx: 'Word', txt: 'TXT', md: 'Markdown' };
+let docList = [];
+let currentCategory = '';
+
+function esc(s) { return Utils.escapeHtml(String(s ?? '')); }
+function fmtDate(s) { return Utils.formatDate(s, true); }
+
+/* ---------- Embedding 是否已配置（决定上传/检索可用性提示） ---------- */
+function checkEmbedReady() {
+    // 有文档已入库说明 Embedding 之前配置过；无文档则提示先配置
+    if (docList.length === 0) {
+        const box = document.getElementById('kb-embed-warning');
+        box.classList.remove('hidden');
+        box.innerHTML = '💡 知识库入库需要「Embedding 向量模型」支持（DeepSeek 不提供向量接口）。请先在 <a href="#/settings" class="underline">系统设置 → Embedding</a> 中配置支持向量化的提供商（如 OpenAI / 通义千问 / 其他 OpenAI 兼容接口），再上传文档。';
+    }
+}
+
+/* ---------- 列表 ---------- */
+async function loadDocs() {
+    const tbody = document.getElementById('kb-tbody');
+    const table = document.getElementById('kb-table');
+    const empty = document.getElementById('kb-empty');
+    const loading = document.getElementById('kb-loading');
+    try {
+        const r = await API.knowledgeBase.list(currentCategory);
+        docList = (r.success && r.data) ? r.data : [];
+    } catch (e) { docList = []; }
+    document.getElementById('kb-count').textContent = docList.length ? `（${docList.length} 篇）` : '';
+    if (!table) return;
+    loading.classList.add('hidden');
+    checkEmbedReady();
+    if (!docList.length) {
+        table.classList.add('hidden');
+        empty.classList.remove('hidden');
+        return;
+    }
+    empty.classList.add('hidden');
+    table.classList.remove('hidden');
+    tbody.innerHTML = docList.map(d => {
+        const ext = EXT_LABEL[d.file_type] || (d.file_type || '').toUpperCase();
+        return `<tr class="border-b" style="border-color:#f1f5f9;">
+            <td class="py-2.5">
+                <div class="font-medium text-gray-800 truncate" style="max-width:200px;" title="${esc(d.title)}">${esc(d.title)}</div>
+            </td>
+            <td class="py-2.5"><span class="inline-block px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">${esc(d.category || '其他')}</span></td>
+            <td class="py-2.5 text-gray-500 text-xs">${ext}</td>
+            <td class="py-2.5 text-gray-500">${d.chunk_count}</td>
+            <td class="py-2.5">${statusCell(d)}</td>
+            <td class="py-2.5 text-gray-400 text-xs">${fmtDate(d.created_at)}</td>
+            <td class="py-2.5">
+                <button onclick="previewDoc(${d.id})" class="text-xs text-gray-400 hover:text-blue-500 mr-2" title="预览文本">👁️</button>
+                <button onclick="reparseDoc(${d.id})" class="text-xs text-gray-400 hover:text-blue-500 mr-2" title="重新解析">🔄</button>
+                <button onclick="deleteDoc(${d.id})" class="text-xs text-gray-300 hover:text-red-500" title="删除">🗑️</button>
+            </td>
+        </tr>`;
+    }).join('');
+    // 有文档还在入库：轮询刷新，直到全部完成
+    const processing = docList.some(d => d.index_status === 'pending' || d.index_status === 'processing');
+    if (processing) setTimeout(loadDocs, 2000);
+}
+
+function statusCell(d) {
+    const st = d.index_status || 'done';
+    if (st === 'pending' || st === 'processing') {
+        return `<span class="text-xs px-2 py-1 rounded-full" style="background:#eff6ff;color:#1d4ed8;">⏳ 入库中…</span>`;
+    }
+    if (st === 'error') {
+        const msg = (d.index_error || '入库失败').slice(0, 24);
+        return `<span class="text-xs px-2 py-1 rounded-full cursor-pointer" style="background:#fee2e2;color:#b91c1c;"
+            title="${esc(d.index_error || '入库失败')}" onclick="reparseDoc(${d.id})">⚠️ 失败 ${esc(msg)}</span>`;
+    }
+    const active = d.status === 'active';
+    return `<button onclick="toggleDocStatus(${d.id})" class="text-xs px-2 py-1 rounded-full transition"
+        style="${active ? 'background:#dcfce7;color:#15803d;' : 'background:#f1f5f9;color:#64748b;'}">
+        ${active ? '✓ 启用' : '已停用'}
+    </button>`;
+}
+
+function changeCategory(v) { currentCategory = v; loadDocs(); }
+
+/* ---------- 上传 ---------- */
+let uploadFile = null;
+
+function openUploadModal() {
+    uploadFile = null;
+    document.querySelector('.ta-modal-mask')?.remove();
+    const mask = document.createElement('div');
+    mask.className = 'ta-modal-mask';
+    Object.assign(mask.style, { position: 'fixed', inset: '0', background: 'rgba(15,23,42,0.35)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '12vh' });
+    const panel = document.createElement('div');
+    Object.assign(panel.style, { background: '#fff', borderRadius: '12px', width: '560px', maxWidth: '92vw', boxShadow: '0 20px 50px rgba(0,0,0,0.15)', overflow: 'hidden', animation: 'fadeIn 0.15s ease-out' });
+
+    const dropId = 'kb-dropzone';
+    panel.innerHTML = `
+        <div class="flex items-center justify-between px-5 py-3 border-b" style="border-color:#f1f5f9;">
+            <div>
+                <div class="font-semibold text-gray-800 text-sm">上传文档</div>
+                <div class="text-xs text-gray-400 mt-0.5">自动解析 → 切片 → 向量化 → 入库，供报告生成与智能问答引用</div>
+            </div>
+            <button class="text-gray-300 hover:text-gray-500 text-lg leading-none" data-close>×</button>
+        </div>
+        <div class="px-5 py-4 max-h-[65vh] overflow-y-auto">
+            <div id="${dropId}" class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition"
+                 style="border-color:#cbd5e1;background:#f8fafc;">
+                <div class="text-3xl mb-2">📄</div>
+                <div class="text-sm text-gray-500" id="kb-drop-text">点击选择文件，或拖拽到此处</div>
+                <div class="text-xs text-gray-300 mt-1.5">支持 PDF / Word / TXT / Markdown，≤50MB</div>
+            </div>
+            <div class="mt-4 grid grid-cols-2 gap-4">
+                <div class="col-span-2">
+                    <label class="settings-label">标题 <span class="text-red-400 ml-1">*</span></label>
+                    <input id="kb-upload-title" type="text" class="w-full" placeholder="不填则默认使用文件名">
+                </div>
+                <div class="col-span-2">
+                    <label class="settings-label">分类</label>
+                    <select id="kb-upload-category" class="w-full">
+                        <option value="课程体系">课程体系</option>
+                        <option value="师资">师资</option>
+                        <option value="收费">收费</option>
+                        <option value="案例">案例</option>
+                        <option value="机构">机构</option>
+                        <option value="政策">政策</option>
+                        <option value="其他" selected>其他</option>
+                    </select>
+                </div>
+                <label class="col-span-2 flex items-center gap-2 text-sm text-gray-600 cursor-pointer pt-1">
+                    <input id="kb-upload-auto" type="checkbox">
+                    🤖 AI 自动分类 <span class="text-xs text-gray-400">（根据文档内容判断所属分类，无需手动选择）</span>
+                </label>
+            </div>
+            <div id="kb-upload-error" class="hidden mt-3 p-2.5 rounded-lg text-xs bg-red-50" style="color:#b91c1c;"></div>
+        </div>
+        <div class="flex justify-end gap-2 px-5 py-3 border-t" style="border-color:#f1f5f9;">
+            <button class="btn-outline" data-close style="padding:7px 18px;">取消</button>
+            <button class="btn-primary" data-ok style="padding:7px 18px;">上传并入库</button>
+        </div>`;
+
+    mask.appendChild(panel);
+    document.body.appendChild(mask);
+    const close = () => mask.remove();
+    mask.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', close));
+    mask.addEventListener('mousedown', (e) => { if (e.target === mask) close(); });
+
+    // 拖拽 + 点击选择
+    const dz = panel.querySelector('#' + dropId);
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.pdf,.docx,.txt,.md,.markdown';
+    fileInput.style.display = 'none';
+    panel.appendChild(fileInput);
+    dz.addEventListener('click', () => fileInput.click());
+    dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.style.borderColor = '#3b82f6'; dz.style.background = '#eff6ff'; });
+    dz.addEventListener('dragleave', () => { dz.style.borderColor = '#cbd5e1'; dz.style.background = '#f8fafc'; });
+    dz.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dz.style.borderColor = '#cbd5e1'; dz.style.background = '#f8fafc';
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) setUploadFile(e.dataTransfer.files[0], dropId);
+    });
+    fileInput.addEventListener('change', () => { if (fileInput.files && fileInput.files[0]) setUploadFile(fileInput.files[0], dropId); });
+    window.setUploadFile = setUploadFile;
+
+    // AI 自动分类勾选后禁用手动分类下拉（分类由后台解析后回填）
+    const autoChk = panel.querySelector('#kb-upload-auto');
+    const catSel = panel.querySelector('#kb-upload-category');
+    if (autoChk && catSel) {
+        autoChk.addEventListener('change', () => { catSel.disabled = autoChk.checked; });
+    }
+
+    panel.querySelector('[data-ok]').addEventListener('click', doUpload);
+}
+
+function setUploadFile(file, dropId) {
+    uploadFile = file;
+    const text = document.getElementById('kb-drop-text');
+    if (text) text.textContent = '📎 ' + file.name + '（' + (file.size / 1024).toFixed(0) + ' KB）';
+    const err = document.getElementById('kb-upload-error');
+    if (err) { err.classList.add('hidden'); }
+}
+
+async function doUpload() {
+    const errBox = document.getElementById('kb-upload-error');
+    if (!uploadFile) { showErr(errBox, '请先选择文件'); return; }
+    const title = document.getElementById('kb-upload-title').value.trim();
+    const category = document.getElementById('kb-upload-category').value;
+    const auto = !!(document.getElementById('kb-upload-auto') || {}).checked;
+    const okBtn = document.querySelector('.ta-modal-mask [data-ok]');
+    okBtn.disabled = true; okBtn.textContent = '提交中...';
+    try {
+        const r = await API.knowledgeBase.upload(category, title, uploadFile, auto);
+        if (r.success) {
+            showToast('已提交入库，后台解析中…', 'success');
+            document.querySelector('.ta-modal-mask')?.remove();
+            loadDocs();
+        } else {
+            showErr(errBox, r.error || '上传失败');
+        }
+    } catch (e) { showErr(errBox, e.message || '上传失败'); }
+    okBtn.disabled = false; okBtn.textContent = '上传并入库';
+}
+
+function showErr(box, msg) {
+    if (!box) return;
+    box.textContent = msg;
+    box.classList.remove('hidden');
+}
+
+/* ---------- 预览 ---------- */
+async function previewDoc(id) {
+    const d = docList.find(x => x.id === id);
+    let text = '加载中...';
+    try {
+        const r = await API.knowledgeBase.preview(id);
+        if (r.success) text = r.data.text || '（文档无文本内容）';
+        else text = r.error || '预览失败';
+    } catch (e) { text = e.message; }
+    const bodyHtml = `<pre class="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap" style="max-height:48vh;overflow-y:auto;font-family:inherit;">${esc(text)}</pre>`;
+    Utils.showModal({
+        title: '文档预览',
+        subtitle: d ? `《${d.title}》 · ${d.file_type.toUpperCase()}` : '',
+        width: 640,
+        bodyHtml,
+        hideOk: true,
+    });
+}
+
+/* ---------- 状态 / 重新解析 / 删除 ---------- */
+async function toggleDocStatus(id) {
+    const d = docList.find(x => x.id === id);
+    const to = d.status === 'active' ? 'disabled' : 'active';
+    try {
+        const r = await API.knowledgeBase.toggleStatus(id, to);
+        if (r.success) { showToast(to === 'active' ? '已启用（参与 AI 检索）' : '已停用（不再参与 AI 检索）', 'success'); loadDocs(); }
+        else showToast('操作失败：' + (r.error || ''), 'error');
+    } catch (e) { showToast('操作失败：' + e.message, 'error'); }
+}
+
+async function reparseDoc(id) {
+    const d = docList.find(x => x.id === id);
+    Utils.confirmDialog({
+        title: '重新解析',
+        message: `重新解析《${d ? d.title : ''}》？将删除旧切片并重新入库。`,
+        onOk: async () => {
+            try {
+                const r = await API.knowledgeBase.reparse(id);
+                if (r.success) { showToast('已重新解析（' + r.data.chunk_count + ' 个切片）', 'success'); loadDocs(); }
+                else showToast('重新解析失败：' + (r.error || ''), 'error');
+            } catch (e) { showToast('重新解析失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+function deleteDoc(id) {
+    const d = docList.find(x => x.id === id);
+    Utils.confirmDialog({
+        title: '删除文档',
+        message: `确定删除《${d ? d.title : ''}》？将同时删除源文件与向量数据，不可恢复。`,
+        danger: true,
+        onOk: async () => {
+            try {
+                const r = await API.knowledgeBase.delete(id);
+                if (r.success) { showToast('已删除', 'success'); loadDocs(); }
+                else showToast('删除失败：' + (r.error || ''), 'error');
+            } catch (e) { showToast('删除失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+/* ---------- 检索测试 ---------- */
+function openSearchModal() {
+    const bodyHtml = `
+        <div class="mb-3">
+            <label class="settings-label">检索内容</label>
+            <textarea id="kb-search-query" rows="2" class="w-full" placeholder="输入文本，查看知识库中相关片段"></textarea>
+        </div>
+        <div class="flex items-center gap-4 mb-3">
+            <div class="flex items-center gap-2">
+                <label class="settings-label mb-0">返回条数</label>
+                <select id="kb-search-topk" class="w-auto">
+                    <option value="3">3</option>
+                    <option value="5" selected>5</option>
+                    <option value="10">10</option>
+                </select>
+            </div>
+            <label class="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+                <input id="kb-search-all" type="checkbox"> 包含已停用文档
+            </label>
+        </div>
+        <div id="kb-search-results" class="text-xs text-gray-400">输入内容后点击「检索」</div>`;
+    Utils.showModal({
+        title: '检索测试',
+        subtitle: '向量检索 Top-K，可验证切片质量与 Embedding 配置',
+        width: 640,
+        bodyHtml,
+        hideOk: true,
+    });
+    window.__kbSearchQuery = document.getElementById('kb-search-query');
+    window.__kbSearchTopk = document.getElementById('kb-search-topk');
+    window.__kbSearchAll = document.getElementById('kb-search-all');
+    // 追加检索按钮（showModal 无 OK 按钮，加在 body 下方）
+    const box = document.getElementById('kb-search-results');
+    if (box) {
+        const btn = document.createElement('button');
+        btn.className = 'btn-primary';
+        btn.textContent = '🔍 检索';
+        btn.style.cssText = 'padding:7px 20px;font-size:13px;';
+        btn.addEventListener('click', doSearch);
+        box.parentElement.appendChild(btn);
+    }
+    setTimeout(() => window.__kbSearchQuery && window.__kbSearchQuery.focus(), 50);
+}
+
+async function doSearch() {
+    const box = document.getElementById('kb-search-results');
+    if (!box) return;
+    const query = (window.__kbSearchQuery.value || '').trim();
+    if (!query) { box.innerHTML = '<span class="text-red-500">请输入检索内容</span>'; return; }
+    box.innerHTML = '检索中...';
+    try {
+        const r = await API.knowledgeBase.search({
+            query, top_k: parseInt(window.__kbSearchTopk.value || '5', 10),
+            include_disabled: window.__kbSearchAll.checked,
+        });
+        const results = (r.success && r.data) ? r.data : [];
+        if (!results.length) { box.innerHTML = '<span class="text-gray-400">未检索到相关内容（可尝试包含已停用文档）</span>'; return; }
+        box.innerHTML = results.map((it, i) => `
+            <div class="mb-2.5 p-2.5 rounded-lg border" style="border-color:#e2e8f0;background:#f8fafc;">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded" style="background:#eff6ff;color:#1d4ed8;">#${i + 1}</span>
+                    <span class="font-medium text-gray-700">${esc(it.title)}</span>
+                    <span class="text-gray-300">·</span>
+                    <span class="text-gray-400">${esc(it.category)}</span>
+                    <span class="ml-auto text-gray-300">相似度 ${(it.distance === null || it.distance === undefined) ? '-' : (1 - it.distance).toFixed(3)}</span>
+                </div>
+                <div class="text-gray-500 leading-relaxed">${esc(it.snippet)}</div>
+            </div>`).join('');
+    } catch (e) { box.innerHTML = '<span class="text-red-500">检索失败：' + esc(e.message) + '</span>'; }
+}
+
+/* ---------- 重建知识库 ---------- */
+function rebuildKb() {
+    Utils.confirmDialog({
+        title: '重建知识库',
+        message: '将清空全部向量，并按当前已启用的文档重新解析入库。仅在切换 Embedding 模型后需要执行，确认继续？',
+        danger: true,
+        onOk: async () => {
+            try {
+                const r = await API.knowledgeBase.rebuild();
+                const data = r.data || {};
+                const msg = '重建完成，共 ' + (data.chunk_count || 0) + ' 个切片' + ((data.errors && data.errors.length) ? '，失败 ' + data.errors.length + ' 篇：' + data.errors.join('；') : '');
+                showToast(msg, data.errors && data.errors.length ? 'error' : 'success');
+                loadDocs();
+            } catch (e) { showToast('重建失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+/* ---------- 智能问答跳转 ---------- */
+function goToQA() { location.hash = '#/knowledge-base/qa'; }
+
+/* ---------- 注册刷新 ---------- */
+window.currentPageRefresh = loadDocs;
+
+/* ---------- IIFE 作用域导出 ---------- */
+Object.assign(window, {
+    loadDocs, changeCategory, openUploadModal, previewDoc,
+    toggleDocStatus, reparseDoc, deleteDoc, openSearchModal, rebuildKb, goToQA,
+});
+
+loadDocs();
+})();
+</script>

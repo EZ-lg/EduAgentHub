@@ -1,9 +1,201 @@
-<!-- 知识库智能问答页 -->
-<div class="fade-in">
-    <div class="text-center py-12 text-gray-400">
-        <div class="text-4xl mb-4">🤖</div>
-        <p class="text-lg mb-2">知识库智能问答</p>
-        <p class="text-sm">此功能将在 P8 阶段实现</p>
-        <p class="text-xs text-gray-300 mt-4">预设问题 + 自由提问 + 引用来源</p>
+<!-- 知识库智能问答页 — P8：预设问题 + 自由提问 + RAG 引用来源 -->
+<div class="fade-in flex flex-col" style="height:calc(100vh - 130px);">
+    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h2 class="text-sm font-semibold text-gray-700">知识库智能问答
+            <span class="text-xs text-gray-400 font-normal">AI 基于机构知识库回答 · 历史自动保存</span>
+        </h2>
+        <div class="flex items-center gap-3">
+            <button onclick="clearHistory()" class="text-xs text-gray-400 hover:text-red-500 transition">🗑️ 清空历史</button>
+            <button onclick="goBack()" class="text-xs text-blue-500 hover:text-blue-700 transition">← 返回知识库</button>
+        </div>
+    </div>
+
+    <!-- 预设问题 -->
+    <div class="flex items-center gap-2 mb-3 flex-wrap">
+        <span class="text-xs text-gray-400 mr-1">快捷提问：</span>
+        <div id="qa-presets" class="flex gap-2 flex-wrap"></div>
+    </div>
+
+    <!-- 对话区 -->
+    <div id="qa-chat" class="flex-1 overflow-y-auto panel p-4 space-y-3" style="min-height:0;">
+        <div class="text-center py-10 text-gray-300">
+            <div class="text-4xl mb-3">🤖</div>
+            <div class="text-sm">上传知识库文档后，向我提问即可获取基于机构资料的解答</div>
+            <div class="text-xs text-gray-300 mt-2">回答底部会标注引用的知识库文档</div>
+        </div>
+    </div>
+
+    <!-- 输入区 -->
+    <div class="mt-3 flex gap-2">
+        <textarea id="qa-input" rows="1" placeholder="输入问题，Enter 发送，Shift+Enter 换行"
+                  class="flex-1 text-sm border rounded-lg px-3 py-2.5 resize-none"
+                  style="border-color:#e2e8f0;max-height:120px;"></textarea>
+        <button id="qa-send" onclick="sendQuestion()" class="btn-primary" style="padding:0 22px;font-size:13px;">提问</button>
     </div>
 </div>
+
+<script>
+(function () {
+let sending = false;
+let qaHistory = [];
+
+function esc(s) { return Utils.escapeHtml(String(s ?? '')); }
+
+/* ---------- 历史（后端持久化，跨会话保留最近 30 条） ---------- */
+async function loadHistory() {
+    try {
+        const r = await API.knowledgeBase.qaHistory();
+        const items = (r.success && r.data) ? r.data : [];
+        qaHistory = [];
+        items.forEach(h => {
+            qaHistory.push({ role: 'user', content: h.question });
+            qaHistory.push({ role: 'ai', content: h.answer || '', references: h.references || [] });
+        });
+    } catch (e) { qaHistory = []; }
+    renderHistory();
+}
+
+function clearHistory() {
+    Utils.confirmDialog({
+        title: '清空问答历史',
+        message: '确定清空全部问答记录？此操作不可恢复。',
+        danger: true,
+        onOk: async () => {
+            try {
+                const r = await API.knowledgeBase.clearHistory();
+                if (r.success) { qaHistory = []; renderHistory(); showToast('已清空', 'success'); }
+                else showToast('清空失败：' + (r.error || ''), 'error');
+            } catch (e) { showToast('清空失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+/* ---------- 渲染 ---------- */
+function renderHistory() {
+    const chat = document.getElementById('qa-chat');
+    if (!qaHistory.length) {
+        chat.innerHTML = `<div class="text-center py-10 text-gray-300">
+            <div class="text-4xl mb-3">🤖</div>
+            <div class="text-sm">上传知识库文档后，向我提问即可获取基于机构资料的解答</div>
+            <div class="text-xs text-gray-300 mt-2">回答底部会标注引用的知识库文档</div>
+        </div>`;
+        return;
+    }
+    chat.innerHTML = qaHistory.map(m => m.role === 'user' ? userBubble(m.content) : aiBubble(m)).join('');
+}
+
+function userBubble(text) {
+    return `<div class="flex justify-end">
+        <div class="max-w-[75%] bg-blue-500 text-white text-sm rounded-2xl rounded-br-sm px-4 py-2.5 whitespace-pre-wrap">${esc(text)}</div>
+    </div>`;
+}
+
+function aiBubble(m) {
+    const refs = (m.references && m.references.length)
+        ? `<div class="mt-2.5 pt-2 border-t" style="border-color:#f1f5f9;">
+            <div class="text-xs text-gray-400 mb-1">📚 引用来源</div>
+            <div class="flex flex-wrap gap-1.5">
+                ${m.references.map(r => `<span class="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600" title="${esc(r.snippet || '')}">《${esc(r.title)}》</span>`).join('')}
+            </div>
+          </div>`
+        : '';
+    return `<div class="flex justify-start">
+        <div class="max-w-[80%] bg-white border text-sm text-gray-700 rounded-2xl rounded-bl-sm px-4 py-2.5" style="border-color:#f1f5f9;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+            <div class="whitespace-pre-wrap leading-relaxed">${esc(m.content)}</div>
+            ${m.error ? `<div class="mt-1 text-xs text-red-500">⚠️ ${esc(m.error)}</div>` : ''}
+            ${refs}
+        </div>
+    </div>`;
+}
+
+function aiLoadingBubble() {
+    return `<div class="flex justify-start" id="qa-loading">
+        <div class="bg-white border text-sm text-gray-400 rounded-2xl rounded-bl-sm px-4 py-3" style="border-color:#f1f5f9;">
+            <span class="inline-flex items-center gap-1.5">🤖 <span class="qa-dots">思考中</span></span>
+        </div>
+    </div>`;
+}
+
+function scrollToBottom() {
+    const chat = document.getElementById('qa-chat');
+    if (chat) chat.scrollTop = chat.scrollHeight;
+}
+
+/* ---------- 提问 ---------- */
+async function sendQuestion(question) {
+    if (sending) return;
+    const input = document.getElementById('qa-input');
+    const q = (question ?? input.value).trim();
+    if (!q) return;
+    qaHistory.push({ role: 'user', content: q });
+    const chat = document.getElementById('qa-chat');
+    // 清空初始提示
+    const empty = chat.querySelector('.text-center');
+    if (empty) empty.remove();
+    chat.innerHTML += userBubble(q) + aiLoadingBubble();
+    input.value = '';
+    input.style.height = 'auto';
+    scrollToBottom();
+    sending = true;
+    document.getElementById('qa-send').disabled = true;
+    const loadingEl = document.getElementById('qa-loading');
+    const finish = (entry) => {
+        qaHistory.push(entry);
+        const bubble = aiBubble(entry);
+        if (loadingEl) loadingEl.outerHTML = bubble; else chat.innerHTML += bubble;
+        sending = false;
+        document.getElementById('qa-send').disabled = false;
+        scrollToBottom();
+    };
+    try {
+        const r = await API.knowledgeBase.qa(q);
+        if (r.success && r.data) finish({ role: 'ai', content: r.data.answer || '', references: r.data.references || [] });
+        else finish({ role: 'ai', content: '', error: r.error || '请求失败' });
+    } catch (e) {
+        finish({ role: 'ai', content: '', error: e.message });
+    }
+}
+
+/* ---------- 预设问题 ---------- */
+async function loadPresets() {
+    const box = document.getElementById('qa-presets');
+    try {
+        const r = await API.knowledgeBase.presets();
+        const list = (r.success && r.data && r.data.length) ? r.data : [];
+        box.innerHTML = list.map((p, i) => `<button data-preset="${i}"
+            class="text-xs px-3 py-1.5 rounded-full bg-white border text-gray-500 hover:text-blue-600 hover:border-blue-300 transition"
+            style="border-color:#e2e8f0;">${esc(p)}</button>`).join('');
+        box.querySelectorAll('[data-preset]').forEach(btn => {
+            btn.addEventListener('click', () => sendQuestion(list[parseInt(btn.dataset.preset, 10)]));
+        });
+    } catch (e) { box.innerHTML = ''; }
+}
+
+/* ---------- 输入事件 ---------- */
+function setupInput() {
+    const input = document.getElementById('qa-input');
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendQuestion();
+        }
+    });
+    input.addEventListener('input', () => {
+        input.style.height = 'auto';
+        input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+    });
+}
+
+function goBack() { location.hash = '#/knowledge-base'; }
+
+/* ---------- 注册刷新 ---------- */
+window.currentPageRefresh = () => { loadPresets(); loadHistory(); };
+
+/* ---------- IIFE 作用域导出 ---------- */
+Object.assign(window, { sendQuestion, goBack, clearHistory });
+
+loadPresets();
+loadHistory();
+setupInput();
+})();
+</script>
