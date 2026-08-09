@@ -94,6 +94,8 @@ body {
 .stat-dot-purple { background: #8b5cf6; }
 .stat-dot-pink   { background: #ec4899; }
 .stat-dot-amber  { background: #f59e0b; }
+.stat-dot-red    { background: #ef4444; }
+.stat-dot-green  { background: #22c55e; }
 
 /* ========== 按钮 ========== */
 .btn-primary {

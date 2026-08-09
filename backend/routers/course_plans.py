@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from backend.models import get_db
 from backend.models.course_plan import CoursePlan
 from backend.services import score_analyzer
+from backend.utils.activity import log_activity
 from backend.utils.helpers import success_response, now_iso
 
 router = APIRouter(prefix="/api", tags=["course_plans"])
@@ -28,6 +29,8 @@ def create_plan(subject_id: int, data: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="plan_json 必须是数组")
     plan = score_analyzer.save_plan_version(
         db, subject_id, plan_rows, str(data.get("adjustment_reason") or "").strip())
+    log_activity(db, "保存课程规划", f"新版本 v{plan.get('version')}", subject_id=subject_id)
+    db.commit()
     return success_response(plan)
 
 
@@ -39,6 +42,8 @@ def save_plan(subject_id: int, data: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="plan_json 必须是数组")
     plan = score_analyzer.save_plan_version(
         db, subject_id, plan_rows, str(data.get("adjustment_reason") or "").strip())
+    log_activity(db, "保存课程规划", f"新版本 v{plan.get('version')}", subject_id=subject_id)
+    db.commit()
     return success_response(plan)
 
 
@@ -58,6 +63,7 @@ def update_plan(plan_id: int, data: dict, db: Session = Depends(get_db)):
     for field in ["plan_json", "status", "adjustment_reason"]:
         if field in data:
             setattr(plan, field, data[field])
+    log_activity(db, "编辑课程规划", f"版本 v{plan.version}", subject_id=plan.subject_id)
     db.commit()
     db.refresh(plan)
     return success_response(plan.to_dict())

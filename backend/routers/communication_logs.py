@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from backend.models import get_db
 from backend.models.communication_log import CommunicationLog
+from backend.utils.activity import log_activity
 from backend.utils.helpers import success_response, now_iso
 
 router = APIRouter(prefix="/api", tags=["communication_logs"])
@@ -29,6 +30,7 @@ def create_log(subject_id: int, data: dict, db: Session = Depends(get_db)):
         log_time=data.get("log_time", now_iso()),
     )
     db.add(log)
+    log_activity(db, "新增沟通日志", f"方式：{log.method}", subject_id=subject_id)
     db.commit()
     db.refresh(log)
     return success_response(log.to_dict())
@@ -43,6 +45,7 @@ def update_log(log_id: int, data: dict, db: Session = Depends(get_db)):
     for field in ["method", "content", "log_time"]:
         if field in data:
             setattr(log, field, data[field])
+    log_activity(db, "编辑沟通日志", subject_id=log.subject_id)
     db.commit()
     db.refresh(log)
     return success_response(log.to_dict())
@@ -54,6 +57,7 @@ def delete_log(log_id: int, db: Session = Depends(get_db)):
     log = db.query(CommunicationLog).filter(CommunicationLog.id == log_id).first()
     if not log:
         raise HTTPException(status_code=404, detail="日志不存在")
+    log_activity(db, "删除沟通日志", subject_id=log.subject_id)
     db.delete(log)
     db.commit()
     return success_response({"deleted": True})

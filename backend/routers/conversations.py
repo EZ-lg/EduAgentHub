@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from backend.models import get_db
 from backend.models.ai_conversation import AIConversation
 from backend.services import conversation_service
+from backend.utils.activity import log_activity
 from backend.utils.helpers import success_response
 
 router = APIRouter(prefix="/api", tags=["conversations"])
@@ -25,7 +26,10 @@ def _resolve_conversation_id(db: Session, subject_id: int, data: dict = None):
 @router.post("/subjects/{subject_id}/conversation/start")
 def start_conversation(subject_id: int, db: Session = Depends(get_db)):
     """开始（或恢复）一次 AI 对话采集，返回会话 + 是否已配置 + 学科/学生信息"""
-    return success_response(conversation_service.start_conversation(db, subject_id))
+    result = conversation_service.start_conversation(db, subject_id)
+    log_activity(db, "开启AI对话采集", subject_id=subject_id)
+    db.commit()
+    return success_response(result)
 
 
 @router.post("/subjects/{subject_id}/conversation/message")
@@ -45,7 +49,10 @@ def end_conversation(subject_id: int, data: dict = None, db: Session = Depends(g
     conv_id = _resolve_conversation_id(db, subject_id, data)
     if not conv_id:
         raise HTTPException(status_code=400, detail="缺少 conversation_id 且无进行中的会话")
-    return success_response(conversation_service.end_conversation(db, subject_id, conv_id))
+    result = conversation_service.end_conversation(db, subject_id, conv_id)
+    log_activity(db, "完成AI对话采集", subject_id=subject_id)
+    db.commit()
+    return success_response(result)
 
 
 @router.get("/subjects/{subject_id}/conversations")

@@ -152,5 +152,8 @@ window.API = {
     dashboard: {
         stats() { return API.get('/api/dashboard/stats'); },
         activities() { return API.get('/api/dashboard/activities'); },
+        board() { return API.get('/api/dashboard/board'); },
+        trend() { return API.get('/api/dashboard/trend'); },
+        subjectDist() { return API.get('/api/dashboard/subject-dist'); },
     },
 };

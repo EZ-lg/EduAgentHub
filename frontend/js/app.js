@@ -224,6 +224,18 @@ const app = createApp({
         } catch (err) {
             console.error('Navbar load error:', err);
         }
+        // 加载机构名称（P9：显示在侧边栏）
+        try {
+            const r = await API.settings.getAll();
+            const org = (r.success && r.data.org_name) || {};
+            if (org.name) {
+                store.orgName = org.name;
+                const el = document.getElementById('navbar-org-name');
+                if (el) el.textContent = org.name;
+            }
+        } catch (err) {
+            console.error('加载机构名称失败:', err);
+        }
     },
 });
 

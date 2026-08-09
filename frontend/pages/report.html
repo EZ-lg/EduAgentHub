@@ -27,6 +27,7 @@
         <!-- 机构抬头 -->
         <div id="pdf-letterhead" class="text-center px-6 pt-6 pb-4" style="border-bottom:3px solid #2563eb;">
             <div class="deco-line"></div>
+            <img id="pdf-logo" class="hidden mx-auto mb-2" style="max-height:48px;max-width:120px;object-fit:contain;" alt="logo">
             <div id="pdf-org" class="text-xl font-bold" style="color:#2563eb;">XX教育机构</div>
             <div id="pdf-title" class="text-base mt-1 font-semibold text-gray-700">学情报告</div>
             <div id="pdf-meta" class="text-xs text-gray-400 mt-1"></div>
@@ -61,6 +62,7 @@ const state = {
     studentName: '',
     teachers: [],
     orgName: store.orgName,
+    orgLogo: '',
     busy: false,
 };
 
@@ -104,6 +106,7 @@ async function loadReport() {
         try {
             const pr = await API.reports.pdf(reportId);
             if (pr.success && pr.data.org_name) state.orgName = pr.data.org_name;
+            if (pr.success && pr.data.org_info && pr.data.org_info.logo) state.orgLogo = pr.data.org_info.logo;
         } catch (e) { /* 兜底 */ }
 
         loading.classList.add('hidden');
@@ -131,6 +134,11 @@ function renderReport() {
     document.getElementById('publish-btn').textContent = r.status === 'published' ? '取消发布' : '发布';
 
     document.getElementById('pdf-org').textContent = state.orgName;
+    const logoImg = document.getElementById('pdf-logo');
+    if (logoImg) {
+        if (state.orgLogo) { logoImg.src = state.orgLogo; logoImg.classList.remove('hidden'); }
+        else logoImg.classList.add('hidden');
+    }
     document.getElementById('pdf-title').textContent = r.title || '学习计划';
     const dateStr = Utils.formatDate(r.updated_at, true);
     document.getElementById('pdf-meta').innerHTML =

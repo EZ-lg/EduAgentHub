@@ -19,6 +19,7 @@ from backend.models import get_db
 from backend.models.knowledge_doc import KnowledgeDoc
 from backend.models.qa_history import QaHistory
 from backend.services import document_parser, kb_service
+from backend.utils.activity import log_activity
 from backend.utils.helpers import success_response
 from config import UPLOAD_DIR
 
@@ -95,6 +96,7 @@ def _ingest_doc_async(doc_id: int, auto_category: bool = False):
         count = kb_service.index_document(db, doc)  # 内部设置 chunk_count 并 commit
         doc.index_status = "done"
         doc.index_error = ""
+        log_activity(db, "上传知识库文档", f"《{doc.title}》（{count} 个切片）")
         db.commit()
     except Exception as e:
         db.rollback()
@@ -177,6 +179,7 @@ def delete_doc(doc_id: int, db: Session = Depends(get_db)):
     doc = _get_doc(db, doc_id)
     kb_service.delete_document_vectors(doc.id)
     file_path = doc.file_path
+    log_activity(db, "删除知识库文档", f"《{doc.title}》")
     db.delete(doc)
     db.commit()
     if file_path and os.path.exists(file_path):
@@ -204,6 +207,7 @@ def reparse_doc(doc_id: int, db: Session = Depends(get_db)):
         count = kb_service.reparse_document(db, doc)
         doc.index_status = "done"
         doc.index_error = ""
+        log_activity(db, "重新解析知识库文档", f"《{doc.title}》")
         db.commit()
     except HTTPException:
         raise

@@ -99,12 +99,48 @@
 
     <!-- ============ 机构信息 ============ -->
     <div id="settings-tab-org" class="settings-tab-panel hidden">
-        <div class="panel">
-            <div class="panel-title">🏢 机构信息</div>
-            <div class="text-center py-10 text-gray-300">
-                <div class="text-2xl mb-2">🏫</div>
-                <p>此模块将在后续阶段实现</p>
-                <p class="text-xs text-gray-300 mt-2">机构名称 / 地址 / 电话 / Logo（用于 PDF 抬头）</p>
+        <div class="grid grid-cols-2 gap-4 items-start">
+            <div class="panel">
+                <div class="panel-title">🏢 机构信息 <span class="text-xs font-normal text-gray-400">(用于侧边栏与报告 PDF 抬头)</span></div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="settings-label">机构名称</label>
+                        <input type="text" id="org-name" class="w-full" placeholder="如：XX教育机构">
+                    </div>
+                    <div>
+                        <label class="settings-label">地址</label>
+                        <input type="text" id="org-address" class="w-full" placeholder="如：北京市海淀区中关村大街 25 号">
+                    </div>
+                    <div>
+                        <label class="settings-label">联系电话</label>
+                        <input type="text" id="org-phone" class="w-full" placeholder="如：010-88888888">
+                    </div>
+                    <div>
+                        <label class="settings-label">Logo</label>
+                        <div class="flex items-center gap-3">
+                            <img id="org-logo-preview" class="hidden w-12 h-12 rounded object-contain" style="border:1px solid #f1f5f9;" alt="logo">
+                            <label class="btn-outline cursor-pointer" style="padding:6px 14px;font-size:13px;">
+                                📎 选择图片
+                                <input type="file" id="org-logo-input" accept="image/*" class="hidden" onchange="handleOrgLogo(this)">
+                            </label>
+                            <button type="button" onclick="clearOrgLogo()" class="text-xs text-gray-400 hover:text-red-500">移除</button>
+                        </div>
+                        <div class="text-xs text-gray-300 mt-1.5">建议 ≤200KB，PNG/JPG，用于报告 PDF 抬头显示</div>
+                    </div>
+                    <div class="flex gap-2 pt-1">
+                        <button class="btn-primary" onclick="saveOrg()">💾 保存机构信息</button>
+                    </div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">👁️ 预览</div>
+                <div class="rounded-lg text-center px-6 py-5" style="border:3px solid #2563eb;background:#fff;">
+                    <div class="text-xl font-bold" style="color:#2563eb;" id="org-preview-name">机构名称</div>
+                    <div class="text-xs text-gray-400 mt-1" id="org-preview-meta"></div>
+                </div>
+                <div class="text-xs text-gray-300 mt-3 leading-relaxed">
+                    保存后，左侧边栏与生成的报告 PDF 抬头将使用机构名称。
+                </div>
             </div>
         </div>
     </div>
@@ -128,10 +164,11 @@
             <div class="text-center py-8">
                 <div class="text-3xl mb-2">📚</div>
                 <div class="text-lg font-bold text-gray-800">教培智能体</div>
-                <div class="text-xs text-gray-400 mt-1">v1.0.0 · P2 AI 服务层</div>
+                <div class="text-xs text-gray-400 mt-1">v1.0.0 · P9 全功能版</div>
                 <div class="text-xs text-gray-300 mt-4 leading-relaxed">
                     教培机构一站式学员管理及 AI 助学工具<br>
-                    FastAPI + SQLite + ChromaDB + Vue 3 · 本地运行，数据不出电脑
+                    FastAPI + SQLite + ChromaDB + Vue 3 · 本地运行，数据不出电脑<br>
+                    学生档案 · AI 对话采集 · 学情报告 · 成绩追踪 · 课程规划 · 知识库问答
                 </div>
             </div>
         </div>
@@ -173,6 +210,12 @@ async function initSettings() {
         return;   // 列表没加载成功，后面的回填没有意义
     }
     await loadSavedConfig();
+    loadOrg();
+    // 机构信息实时预览
+    ['org-name', 'org-address', 'org-phone'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', updateOrgPreview);
+    });
 }
 
 async function loadSavedConfig() {
@@ -325,6 +368,81 @@ async function saveEmbed() {
     } catch (e) { alert('保存失败：' + e.message); }
 }
 
+/* ---------- 机构信息 ---------- */
+let orgLogoData = '';
+
+async function loadOrg() {
+    try {
+        const r = await API.settings.getAll();
+        const org = (r.success && r.data.org_name) || {};
+        document.getElementById('org-name').value = org.name || '';
+        document.getElementById('org-address').value = org.address || '';
+        document.getElementById('org-phone').value = org.phone || '';
+        orgLogoData = org.logo || '';
+        updateOrgPreview();
+    } catch (e) { console.error('加载机构信息失败', e); }
+}
+
+function updateOrgPreview() {
+    const name = document.getElementById('org-name').value.trim();
+    const addr = document.getElementById('org-address').value.trim();
+    const phone = document.getElementById('org-phone').value.trim();
+    document.getElementById('org-preview-name').textContent = name || '机构名称';
+    const meta = [addr, phone].filter(Boolean).join(' · ');
+    document.getElementById('org-preview-meta').textContent = meta || '地址 · 电话';
+
+    const img = document.getElementById('org-logo-preview');
+    if (orgLogoData) {
+        img.src = orgLogoData;
+        img.classList.remove('hidden');
+    } else {
+        img.src = '';
+        img.classList.add('hidden');
+    }
+}
+
+function handleOrgLogo(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > 200 * 1024) {
+        showToast('Logo 图片请控制在 200KB 以内', 'error');
+        input.value = '';
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        orgLogoData = e.target.result;
+        updateOrgPreview();
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearOrgLogo() {
+    orgLogoData = '';
+    document.getElementById('org-logo-input').value = '';
+    updateOrgPreview();
+}
+
+async function saveOrg() {
+    const data = {
+        name: document.getElementById('org-name').value.trim(),
+        address: document.getElementById('org-address').value.trim(),
+        phone: document.getElementById('org-phone').value.trim(),
+        logo: orgLogoData,
+    };
+    if (!data.name) { showToast('请填写机构名称', 'error'); return; }
+    try {
+        const r = await API.settings.update({ org_name: data });
+        if (r.success) {
+            // 同步侧边栏机构名
+            try { store.orgName = data.name; document.getElementById('navbar-org-name').textContent = data.name; } catch (e) {}
+            showToast('机构信息已保存', 'success');
+        } else {
+            showToast('保存失败：' + (r.error || '未知错误'), 'error');
+        }
+    } catch (e) { showToast('保存失败：' + e.message, 'error'); }
+}
+
 /* ---------- 工具 ---------- */
 function switchSettingsTab(name) {
     document.querySelectorAll('.settings-tab').forEach(b => {
@@ -348,6 +466,7 @@ initSettings();
 Object.assign(window, {
     saveLLM, saveEmbed, testLLM, testEmbed,
     switchSettingsTab, toggleKey, onLLMProviderChange, onEmbProviderChange,
+    saveOrg, handleOrgLogo, clearOrgLogo, loadOrg,
 });
 })();
 </script>

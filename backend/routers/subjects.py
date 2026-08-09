@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from backend.models import get_db
 from backend.models.subject import Subject
+from backend.utils.activity import log_activity
 from backend.utils.helpers import success_response, now_iso
 
 router = APIRouter(prefix="/api", tags=["subjects"])
@@ -28,6 +29,8 @@ def create_subject(data: dict, db: Session = Depends(get_db)):
         status=data.get("status", "active"),
     )
     db.add(subject)
+    db.flush()  # 拿到 id 供活动日志关联
+    log_activity(db, "新增学科", f"新增「{subject.name}」", student_id=subject.student_id, subject_id=subject.id)
     db.commit()
     db.refresh(subject)
     return success_response(subject.to_dict())
@@ -51,6 +54,7 @@ def update_subject(subject_id: int, data: dict, db: Session = Depends(get_db)):
     if "name" in data:
         subject.name = data["name"]
     subject.updated_at = now_iso()
+    log_activity(db, "编辑学科", f"学科「{subject.name}」", student_id=subject.student_id, subject_id=subject.id)
     db.commit()
     db.refresh(subject)
     return success_response(subject.to_dict())
@@ -67,5 +71,7 @@ def update_subject_status(subject_id: int, data: dict, db: Session = Depends(get
         raise HTTPException(status_code=400, detail="无效状态（应为 active 或 paused）")
     subject.status = status
     subject.updated_at = now_iso()
+    label = "启用" if status == "active" else "停用"
+    log_activity(db, f"{label}学科", f"学科「{subject.name}」", student_id=subject.student_id, subject_id=subject.id)
     db.commit()
     return success_response(subject.to_dict())

@@ -12,6 +12,7 @@ from backend.models.setting import Setting
 from backend.models.student import Student
 from backend.models.subject import Subject
 from backend.services import report_generator
+from backend.utils.activity import log_activity
 from backend.utils.export_docx import build_report_docx
 from backend.utils.helpers import success_response, now_iso
 
@@ -31,6 +32,8 @@ def list_reports(subject_id: int, db: Session = Depends(get_db)):
 def generate_report(subject_id: int, data: dict = None, db: Session = Depends(get_db)):
     """生成报告：基于最近 completed 会话的学情总结，AI 生成 4 节 + 课程规划记录"""
     report = report_generator.generate_report(db, subject_id, data or {})
+    log_activity(db, "生成学情报告", f"报告「{report.get('title') or ''}」", subject_id=subject_id)
+    db.commit()
     return success_response(report)
 
 
@@ -59,6 +62,7 @@ def update_report(report_id: int, data: dict, db: Session = Depends(get_db)):
         # 指向最新课程规划版本（P6：报告页/规划Tab保存新版本后同步）
         report.course_plan_id = data["course_plan_id"] if data["course_plan_id"] is not None else None
     report.updated_at = now_iso()
+    log_activity(db, "编辑报告", f"报告「{report.title}」", subject_id=report.subject_id)
     db.commit()
     db.refresh(report)
     return success_response(report.to_dict())
@@ -68,6 +72,8 @@ def update_report(report_id: int, data: dict, db: Session = Depends(get_db)):
 def regenerate_report(report_id: int, data: dict = None, db: Session = Depends(get_db)):
     """重新生成报告：body {extra_info, section?}，section 缺省全量重生成"""
     report = report_generator.regenerate_report(db, report_id, data or {})
+    log_activity(db, "重新生成报告", f"报告「{report.get('title') or ''}」", subject_id=report.get("subject_id"))
+    db.commit()
     return success_response(report)
 
 
@@ -81,10 +87,14 @@ def export_pdf(report_id: int, db: Session = Depends(get_db)):
     student = db.get(Student, subject.student_id) if subject else None
     org = db.query(Setting).filter(Setting.key == "org_name").first()
     org_name = ""
+    org_info = None
     if org and org.value_json:
         try:
             import json
-            org_name = str(json.loads(org.value_json).get("name") or "")
+            parsed = json.loads(org.value_json)
+            if isinstance(parsed, dict):
+                org_info = parsed
+                org_name = str(parsed.get("name") or "")
         except Exception:
             org_name = ""
     return success_response({
@@ -92,6 +102,7 @@ def export_pdf(report_id: int, db: Session = Depends(get_db)):
         "subject": subject.to_dict() if subject else None,
         "student": student.to_dict() if student else None,
         "org_name": org_name,
+        "org_info": org_info,
     })
 
 

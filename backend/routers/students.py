@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from backend.models import get_db
 from backend.models.student import Student
 from backend.models.subject import Subject
+from backend.utils.activity import log_activity
 from backend.utils.helpers import success_response, now_iso
 
 router = APIRouter(prefix="/api/students", tags=["students"])
@@ -81,6 +82,8 @@ def create_student(data: dict, db: Session = Depends(get_db)):
         notes=data.get("notes", ""),
     )
     db.add(student)
+    db.flush()  # 拿到 id 供活动日志关联
+    log_activity(db, "新建学生", f"学生「{student.name}」", student_id=student.id)
     db.commit()
     db.refresh(student)
     return success_response(student.to_dict())
@@ -106,6 +109,7 @@ def update_student(student_id: int, data: dict, db: Session = Depends(get_db)):
         if field in data:
             setattr(student, field, data[field])
     student.updated_at = now_iso()
+    log_activity(db, "编辑学生", f"学生「{student.name}」", student_id=student.id)
     db.commit()
     db.refresh(student)
     return success_response(student.to_dict())
@@ -117,6 +121,7 @@ def delete_student(student_id: int, db: Session = Depends(get_db)):
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="学生不存在")
+    log_activity(db, "删除学生", f"学生「{student.name}」", student_id=student.id)
     db.delete(student)
     db.commit()
     return success_response({"deleted": True})
@@ -133,5 +138,7 @@ def update_student_status(student_id: int, data: dict, db: Session = Depends(get
         raise HTTPException(status_code=400, detail="无效状态")
     student.status = status
     student.updated_at = now_iso()
+    label = {"active": "在读", "completed": "已结课", "abandoned": "已放弃"}.get(status, status)
+    log_activity(db, "更新学生状态", f"学生「{student.name}」→{label}", student_id=student.id)
     db.commit()
     return success_response(student.to_dict())

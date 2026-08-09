@@ -9,6 +9,7 @@ from backend.models import get_db
 from backend.models.score import Score
 from backend.models.subject import Subject
 from backend.services import score_analyzer
+from backend.utils.activity import log_activity
 from backend.utils.helpers import success_response, now_iso
 
 router = APIRouter(prefix="/api", tags=["scores"])
@@ -80,6 +81,7 @@ def create_score(subject_id: int, data: dict, db: Session = Depends(get_db)):
         notes=str(data.get("notes") or ""),
     )
     db.add(score)
+    log_activity(db, "录入成绩", f"「{score.exam_name or '考试'}」{score.score}分", subject_id=subject_id)
     db.commit()
     db.refresh(score)
     return success_response(score.to_dict())
@@ -110,6 +112,7 @@ def batch_create_scores(subject_id: int, data: dict, db: Session = Depends(get_d
             notes=str(it.get("notes") or ""),
         ))
     db.add_all(created)
+    log_activity(db, "批量录入成绩", f"共 {len(created)} 条", subject_id=subject_id)
     db.commit()
     return success_response({"inserted": len(created)})
 
@@ -141,6 +144,7 @@ def update_score(score_id: int, data: dict, db: Session = Depends(get_db)):
             setattr(score, field, data[field])
     if "exam_date" in data:
         score.exam_date = _normalize_date(data["exam_date"])
+    log_activity(db, "编辑成绩", f"「{score.exam_name or '考试'}」", subject_id=score.subject_id)
     db.commit()
     db.refresh(score)
     return success_response(score.to_dict())
@@ -152,6 +156,7 @@ def delete_score(score_id: int, db: Session = Depends(get_db)):
     score = db.query(Score).filter(Score.id == score_id).first()
     if not score:
         raise HTTPException(status_code=404, detail="成绩记录不存在")
+    log_activity(db, "删除成绩", f"「{score.exam_name or '考试'}」", subject_id=score.subject_id)
     db.delete(score)
     db.commit()
     return success_response({"deleted": True})
