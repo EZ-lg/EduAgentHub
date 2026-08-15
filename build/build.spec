@@ -14,7 +14,13 @@ block_cipher = None
 PROJECT_ROOT = os.path.join(SPECPATH, '..')
 MAIN_SCRIPT = os.path.join(PROJECT_ROOT, 'main.py')
 
-datas = [(os.path.join(PROJECT_ROOT, 'frontend'), 'frontend')]
+# frontend 静态资源 + AI prompt 模板（.txt）都必须打包：
+# prompt_loader 运行时从 _MEIPASS/backend/ai/prompts 读模板，漏打包会导致
+# 打包版"测试连接通过但聊天/报告失败"（开发模式读源码目录所以正常）
+datas = [
+    (os.path.join(PROJECT_ROOT, 'frontend'), 'frontend'),
+    (os.path.join(PROJECT_ROOT, 'backend', 'ai', 'prompts'), 'backend/ai/prompts'),
+]
 binaries = []
 hiddenimports = []
 
