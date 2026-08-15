@@ -108,6 +108,30 @@ window.API = {
         delete(id) { return API.delete(`/api/teachers/${id}`); },
     },
 
+    // === 教室（2.0 排课资源）===
+    classrooms: {
+        list(status = '') { return API.get(`/api/classrooms?status=${status}`); },
+        create(data) { return API.post('/api/classrooms', data); },
+        update(id, data) { return API.put(`/api/classrooms/${id}`, data); },
+        delete(id) { return API.delete(`/api/classrooms/${id}`); },
+    },
+
+    // === 班级（2.0 上课维度）===
+    classes: {
+        list(params = {}) {
+            const qs = new URLSearchParams(params).toString();
+            return API.get(`/api/classes?${qs}`);
+        },
+        get(id) { return API.get(`/api/classes/${id}`); },
+        create(data) { return API.post('/api/classes', data); },
+        update(id, data) { return API.put(`/api/classes/${id}`, data); },
+        updateStatus(id, status) { return API.put(`/api/classes/${id}/status`, { status }); },
+        delete(id) { return API.delete(`/api/classes/${id}`); },
+        addStudent(id, data) { return API.post(`/api/classes/${id}/students`, data); },
+        removeStudent(id, sid) { return API.delete(`/api/classes/${id}/students/${sid}`); },
+        createFromSubject(subjectId, data) { return API.post(`/api/classes/from-subject/${subjectId}`, data || {}); },
+    },
+
     // === 知识库 ===
     knowledgeBase: (() => {
         // /api/knowledge-docs（管理）和 /api/knowledge（问答）两个前缀

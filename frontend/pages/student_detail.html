@@ -170,6 +170,7 @@ async function loadSubjects() {
                     <span class="${isActive ? 'text-green-600' : 'text-gray-400'} inline-flex items-center gap-1"><span class="status-dot ${isActive ? 'status-dot--on' : 'status-dot--off'}"></span>${isActive ? '活跃' : '已停用'}</span>
                     <div class="flex items-center gap-2">
                         <button onclick="event.stopPropagation();location.hash='#/conversation/${sub.id}'" class="text-gray-300 hover:text-indigo-500 text-xs inline-flex items-center gap-0.5" title="进入 AI 对话采集"><svg class="icon icon--sm"><use href="#icon-message-square"/></svg> 对话</button>
+                        ${isActive ? `<button onclick="event.stopPropagation();createClassFromSubject(${sub.id})" class="text-gray-300 hover:text-green-600 text-xs inline-flex items-center gap-0.5" title="转为一对一上课班级"><svg class="icon icon--sm"><use href="#icon-user-plus"/></svg> 一对一</button>` : ''}
                         <button onclick="event.stopPropagation();toggleSubject(${sub.id},'${sub.status}')" class="text-gray-300 hover:text-gray-500 text-xs">${isActive ? '停用' : '启用'}</button>
                     </div>
                 </div>
@@ -183,6 +184,38 @@ async function loadSubjects() {
 function selectSubject(id) {
     // 通过路由切换，页面自动重挂载并按 routeSubjectId 选中
     location.hash = `#/student/${studentId}/subject/${id}`;
+}
+
+/* 转为一对一上课班级（2.0 班级管理快捷入口） */
+async function createClassFromSubject(subjectId) {
+    let teacherOpts = [], roomOpts = [];
+    try {
+        const [t, c] = await Promise.all([API.teachers.list(), API.classrooms.list()]);
+        teacherOpts = ((t.success && t.data) || []).map(x => ({ v: x.id, label: x.name }));
+        roomOpts = ((c.success && c.data) || []).filter(x => x.status === 'active')
+            .map(x => ({ v: x.id, label: x.name + (x.location ? '（' + x.location + '）' : '') }));
+    } catch (e) { /* 下拉数据失败不阻塞 */ }
+    Utils.showModal({
+        title: '转为一对一班',
+        subtitle: '将当前学科升级为 1v1 上课班级（绑定教师/教室后即可在班级管理里排课）',
+        width: 520,
+        columns: 2,
+        fields: [
+            { key: 'teacher_id', label: '教师', type: 'select', options: teacherOpts.length ? teacherOpts : [{ v: '', label: '（暂无教师，可后补）' }], section: '排课信息' },
+            { key: 'classroom_id', label: '教室', type: 'select', options: roomOpts.length ? roomOpts : [{ v: '', label: '（暂无教室，可后补）' }], section: '排课信息' },
+            { key: 'weekly_frequency', label: '每周课次', type: 'number', min: 1, default: 2, section: '排课信息' },
+            { key: 'duration_minutes', label: '每次时长(分)', type: 'number', min: 30, default: 120, section: '排课信息' },
+        ],
+        onSubmit: async (data) => {
+            data.teacher_id = data.teacher_id ? Number(data.teacher_id) : null;
+            data.classroom_id = data.classroom_id ? Number(data.classroom_id) : null;
+            try {
+                const r = await API.classes.createFromSubject(subjectId, data);
+                if (r.success) { showToast('已创建一对一班级', 'success'); location.hash = '#/classes/' + r.data.id; }
+                else showToast('创建失败：' + (r.error || '未知错误'), 'error');
+            } catch (e) { showToast('创建失败：' + e.message, 'error'); }
+        },
+    });
 }
 
 function toggleSubject(id, cur) {
@@ -1209,7 +1242,7 @@ window.__pageUnmounted = function () {
 Object.assign(window, {
     changeStudentStatus, deleteStudent, editStudentInfo, toggleSubject,
     generateSubjectReport, refreshStudentDetail, selectSubject,
-    showAddSubjectModal, switchSubjectTab,
+    showAddSubjectModal, switchSubjectTab, createClassFromSubject,
     // 报告删除 + 档案 AI 助手
     deleteReport, openStudentChat, sendStudentChat,
     // P6 成绩 Tab

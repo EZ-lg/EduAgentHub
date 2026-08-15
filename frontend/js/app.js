@@ -160,6 +160,15 @@ const routes = [
         props: true,
     },
     {
+        path: '/classes',
+        component: createPageComponent('classes', '班级管理'),
+    },
+    {
+        path: '/classes/:id',
+        component: createPageComponent('classes', '班级详情'),
+        props: true,
+    },
+    {
         path: '/teachers',
         component: createPageComponent('teachers', '教师管理'),
     },

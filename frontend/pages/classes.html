@@ -1,0 +1,369 @@
+<!-- 班级管理页 — P2：班级 CRUD + 学生增减（一对一/一对多） -->
+<div class="fade-in">
+
+    <!-- ============ 列表视图 ============ -->
+    <div id="class-list-view">
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                <svg class="icon icon--md text-indigo-500"><use href="#icon-users"/></svg>
+                班级管理 <span class="text-xs text-gray-400 font-normal" id="class-count"></span>
+            </h2>
+            <div class="flex gap-2 items-center">
+                <select id="class-status-filter" onchange="loadClasses()" class="text-sm border rounded-lg py-1.5 px-2" style="border-color:#e2e8f0;">
+                    <option value="">全部状态</option>
+                    <option value="active">在读</option>
+                    <option value="paused">已停用</option>
+                </select>
+                <button onclick="showClassModal()" class="btn-primary" style="padding:6px 16px;font-size:13px;">
+                    <svg class="icon icon--md"><use href="#icon-plus"/></svg> 新建班级
+                </button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="text-center py-10 text-gray-300" id="classes-loading">加载中...</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 hidden" id="classes-grid"></div>
+            <div class="hidden" id="classes-empty">
+                <div class="empty-state">
+                    <div class="empty-icon"><svg class="icon"><use href="#icon-users"/></svg></div>
+                    <div class="empty-title">暂无班级</div>
+                    <div class="empty-desc">点击右上角「新建班级」创建。一对一 = 班内 1 人，一对多 = 小班教学</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ 详情视图 ============ -->
+    <div id="class-detail-view" class="hidden">
+        <div class="flex items-center gap-3 mb-4">
+            <button onclick="location.hash='#/classes'" class="btn-outline" style="padding:6px 12px;font-size:13px;">
+                <svg class="icon icon--md"><use href="#icon-arrow-left"/></svg> 返回
+            </button>
+            <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5" id="detail-title">班级详情</h2>
+        </div>
+
+        <!-- 班级信息卡 -->
+        <div class="panel mb-4">
+            <div class="flex items-start justify-between flex-wrap gap-2 mb-3">
+                <div class="flex items-center gap-3">
+                    <div class="text-lg font-bold text-gray-800" id="detail-name"></div>
+                    <span class="badge badge--info" id="detail-type"></span>
+                    <span class="badge" id="detail-status"></span>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="showClassModal(currentClassId)" class="btn-outline" style="padding:6px 14px;font-size:13px;">
+                        <svg class="icon icon--md"><use href="#icon-edit-3"/></svg> 编辑
+                    </button>
+                    <button onclick="toggleClassStatus(currentClassId)" class="btn-outline" style="padding:6px 14px;font-size:13px;" id="btn-toggle-status">
+                        <svg class="icon icon--md"><use href="#icon-pause"/></svg> 停用
+                    </button>
+                    <button onclick="deleteClass(currentClassId)" class="btn-outline" style="padding:6px 14px;font-size:13px;color:#dc2626;border-color:#fecaca;">
+                        <svg class="icon icon--md"><use href="#icon-trash-2"/></svg> 删除
+                    </button>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm" id="detail-meta"></div>
+            <div id="detail-notes" class="mt-3 text-sm text-gray-500"></div>
+        </div>
+
+        <!-- 学生区 -->
+        <div class="panel mb-4">
+            <div class="flex items-center justify-between mb-3">
+                <div class="panel-title"><svg class="icon"><use href="#icon-user-check"/></svg> 班级学生 <span class="text-xs font-normal text-gray-400" id="student-count"></span></div>
+                <button onclick="showAddStudentModal()" class="btn-primary" style="padding:6px 14px;font-size:13px;">
+                    <svg class="icon icon--md"><use href="#icon-plus"/></svg> 添加学生
+                </button>
+            </div>
+            <div id="students-list"></div>
+            <div class="text-xs text-gray-300 mt-3" id="class-type-tip"></div>
+        </div>
+
+        <!-- 课次区（排课占位，P3 上线） -->
+        <div class="panel mb-4">
+            <div class="panel-title"><svg class="icon"><use href="#icon-calendar"/></svg> 上课安排 <span class="text-xs font-normal text-gray-400">智能排课 · 课表</span></div>
+            <div class="text-center py-8 text-gray-300 text-sm">
+                <div class="empty-icon mx-auto mb-2"><svg class="icon"><use href="#icon-calendar"/></svg></div>
+                智能排课功能将在下一阶段（P3）上线<br>
+                届时可一键自动排课（教师/教室/学生零冲突）并经确认后落库
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+/* ---------- 路由参数 ---------- */
+const hashParts = location.hash.split('/');
+const classId = hashParts[2] ? parseInt(hashParts[2]) : null;
+
+let currentClass = null;
+let teacherList = [];
+let classroomList = [];
+let allStudents = [];
+
+function esc(s) { return Utils.escapeHtml(String(s ?? '')); }
+
+/* ---------- 基础数据加载 ---------- */
+async function loadBaseData() {
+    try {
+        const [t, c, s] = await Promise.all([
+            API.teachers.list(),
+            API.classrooms.list(),
+            API.students.list(),
+        ]);
+        teacherList = (t.success && t.data) ? t.data : [];
+        classroomList = (c.success && c.data) ? c.data : [];
+        // students.list 返回分页对象 {items:[...]}，兼容数组与分页两种格式
+        const sdata = (s.success && s.data) ? s.data : [];
+        allStudents = Array.isArray(sdata) ? sdata : (sdata.items || []);
+    } catch (e) { /* 下拉数据失败不阻塞主流程 */ }
+}
+
+/* ---------- 列表视图 ---------- */
+async function loadClasses() {
+    const grid = document.getElementById('classes-grid');
+    const loading = document.getElementById('classes-loading');
+    const empty = document.getElementById('classes-empty');
+    const status = document.getElementById('class-status-filter').value;
+    try {
+        const r = await API.classes.list({ status });
+        const list = (r.success && r.data) ? r.data : [];
+        document.getElementById('class-count').textContent = list.length ? `（${list.length} 个）` : '';
+        loading.classList.add('hidden');
+        if (!list.length) {
+            grid.classList.add('hidden');
+            empty.classList.remove('hidden');
+            return;
+        }
+        empty.classList.add('hidden');
+        grid.classList.remove('hidden');
+        grid.innerHTML = list.map(c => `
+            <div class="border rounded-xl p-4 cursor-pointer hover:shadow-md transition-shadow" style="border-color:#e2e8f0;background:#fff;" onclick="openClassDetail(${c.id})">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="font-semibold text-gray-800 text-sm">${esc(c.name)}</div>
+                    <div class="flex flex-col items-end gap-1 flex-shrink-0">
+                        <span class="badge ${c.class_type === '1v1' ? 'badge--info' : 'badge--warning'}">${c.class_type === '1v1' ? '一对一' : '小班'}</span>
+                        ${c.status === 'active'
+                            ? '<span class="badge" style="background:#ecfdf5;color:#059669;border-color:#a7f3d0;">在读</span>'
+                            : '<span class="badge" style="background:#f1f5f9;color:#64748b;border-color:#e2e8f0;">已停用</span>'}
+                    </div>
+                </div>
+                <div class="text-xs text-gray-500 mt-3 space-y-1">
+                    <div>📘 学科：${esc(c.subject_name || '未设置')}</div>
+                    <div>👨‍🏫 教师：${esc(c.teacher_name || '未指派')}</div>
+                    <div>🏫 教室：${esc(c.classroom_name || '未设置')}</div>
+                </div>
+                <div class="flex items-center gap-3 mt-3 pt-3 border-t text-xs text-gray-400" style="border-color:#f1f5f9;">
+                    <span>👥 ${c.student_count} 人</span>
+                    <span>🗓 ${c.weekly_frequency} 次/周</span>
+                </div>
+            </div>`).join('');
+    } catch (e) {
+        loading.textContent = '加载失败：' + e.message;
+    }
+}
+
+function openClassDetail(id) { location.hash = '#/classes/' + id; }
+
+/* ---------- 详情视图 ---------- */
+async function loadClassDetail() {
+    try {
+        const r = await API.classes.get(classId);
+        if (!r.success) throw new Error(r.error || '班级不存在');
+        currentClass = r.data;
+    } catch (e) {
+        document.getElementById('detail-title').textContent = '班级不存在';
+        document.getElementById('class-list-view').classList.remove('hidden');
+        document.getElementById('class-detail-view').classList.add('hidden');
+        showToast('班级加载失败：' + e.message, 'error');
+        return;
+    }
+    document.getElementById('class-list-view').classList.add('hidden');
+    document.getElementById('class-detail-view').classList.remove('hidden');
+
+    const c = currentClass;
+    document.getElementById('detail-title').textContent = c.name;
+    document.getElementById('detail-name').textContent = c.name;
+    document.getElementById('detail-type').textContent = c.class_type === '1v1' ? '一对一' : '小班（一对多）';
+    const st = document.getElementById('detail-status');
+    if (c.status === 'active') {
+        st.textContent = '在读'; st.style.cssText = 'background:#ecfdf5;color:#059669;border-color:#a7f3d0;';
+    } else {
+        st.textContent = '已停用'; st.style.cssText = 'background:#f1f5f9;color:#64748b;border-color:#e2e8f0;';
+    }
+    document.getElementById('btn-toggle-status').innerHTML = c.status === 'active'
+        ? '<svg class="icon icon--md"><use href="#icon-pause"/></svg> 停用'
+        : '<svg class="icon icon--md"><use href="#icon-play"/></svg> 启用';
+
+    document.getElementById('detail-meta').innerHTML = `
+        <div><div class="text-xs text-gray-400">学科</div><div class="mt-0.5">${esc(c.subject_name || '未设置')}</div></div>
+        <div><div class="text-xs text-gray-400">教师</div><div class="mt-0.5">${esc(c.teacher_name || '未指派')}</div></div>
+        <div><div class="text-xs text-gray-400">教室</div><div class="mt-0.5">${esc(c.classroom_name || '未设置')}</div></div>
+        <div><div class="text-xs text-gray-400">上课频率</div><div class="mt-0.5">每周 ${c.weekly_frequency} 次 · 每次 ${c.duration_minutes} 分钟</div></div>
+        ${c.start_date ? `<div><div class="text-xs text-gray-400">开始日期</div><div class="mt-0.5">${esc(c.start_date)}</div></div>` : ''}
+        ${c.end_date ? `<div><div class="text-xs text-gray-400">结束日期</div><div class="mt-0.5">${esc(c.end_date)}</div></div>` : ''}
+    `;
+    document.getElementById('detail-notes').textContent = c.notes ? '备注：' + c.notes : '';
+    document.getElementById('class-type-tip').textContent = c.class_type === '1v1'
+        ? '一对一班级：最多 1 名学生（从学生学科「转为一对一班」自动创建）'
+        : '小班教学：可添加多名学生，添加时已做重复报班提示，时间冲突检测将在排课阶段（P3）生效';
+
+    renderStudents();
+}
+
+function renderStudents() {
+    const list = currentClass.students || [];
+    document.getElementById('student-count').textContent = `（${list.length} 人）`;
+    const box = document.getElementById('students-list');
+    if (!list.length) {
+        box.innerHTML = '<div class="text-center py-6 text-gray-300 text-sm">暂无学生，点击右上角「添加学生」</div>';
+        return;
+    }
+    box.innerHTML = `<table class="w-full text-sm">
+        <thead><tr>
+            <th style="width:40%;">姓名</th><th style="width:20%;">年级</th>
+            <th style="width:25%;">入班日期</th><th style="width:15%;">操作</th>
+        </tr></thead><tbody>` + list.map(s => `
+        <tr class="border-b align-top" style="border-color:#f1f5f9;">
+            <td class="py-2.5 font-medium text-gray-800">${esc(s.name)}</td>
+            <td class="py-2.5 text-gray-500">${esc(s.grade || '-')}</td>
+            <td class="py-2.5 text-gray-500">${s.enroll_date ? Utils.formatDate(s.enroll_date, true) : '-'}</td>
+            <td class="py-2.5">
+                <button onclick="removeStudent(${s.student_id})" class="text-red-400 hover:text-red-600 text-xs inline-flex items-center gap-1" title="移出班级">
+                    <svg class="icon icon--sm"><use href="#icon-user-x"/></svg> 移除
+                </button>
+            </td>
+        </tr>`).join('') + `</tbody></table>`;
+}
+
+/* ---------- 新建 / 编辑班级 ---------- */
+function showClassModal(id) {
+    const isEdit = !!id;
+    let values = {};
+    if (isEdit && currentClass) {
+        const c = currentClass;
+        values = {
+            name: c.name, subject_name: c.subject_name, class_type: c.class_type,
+            teacher_id: c.teacher_id ? String(c.teacher_id) : '', classroom_id: c.classroom_id ? String(c.classroom_id) : '',
+            weekly_frequency: c.weekly_frequency, duration_minutes: c.duration_minutes,
+            start_date: c.start_date, end_date: c.end_date, notes: c.notes,
+        };
+    }
+    Utils.showModal({
+        title: isEdit ? '编辑班级' : '新建班级',
+        subtitle: isEdit ? '修改班级信息（改后如需重排可在排课阶段处理）' : '创建上课班级（一对一 = 班内 1 人，一对多 = 小班）',
+        width: 560,
+        columns: 2,
+        fields: [
+            { key: 'name', label: '班级名称', required: true, placeholder: '如：初二数学冲刺班', section: '基本信息', full: true },
+            { key: 'class_type', label: '班型', type: 'select', options: [{ v: '1vN', label: '一对多（小班）' }, { v: '1v1', label: '一对一' }], section: '基本信息' },
+            { key: 'subject_name', label: '学科', type: 'select', options: Utils.subjectPresets, section: '基本信息' },
+            { key: 'teacher_id', label: '教师', type: 'select', options: teacherList.map(t => ({ v: t.id, label: t.name })), section: '基本信息' },
+            { key: 'classroom_id', label: '教室', type: 'select', options: classroomList.filter(c => c.status === 'active').map(c => ({ v: c.id, label: c.name + (c.location ? '（' + c.location + '）' : '') })), section: '基本信息' },
+            { key: 'weekly_frequency', label: '每周课次', type: 'number', min: 1, default: 2, section: '排课设置' },
+            { key: 'duration_minutes', label: '每次时长(分)', type: 'number', min: 30, default: 120, section: '排课设置' },
+            { key: 'start_date', label: '开始日期', type: 'date', section: '排课设置' },
+            { key: 'end_date', label: '结束日期', type: 'date', section: '排课设置' },
+            { key: 'notes', label: '备注', type: 'textarea', rows: 2, placeholder: '选填', section: '其他', full: true },
+        ],
+        values,
+        onSubmit: async (data) => {
+            data.teacher_id = data.teacher_id ? Number(data.teacher_id) : null;
+            data.classroom_id = data.classroom_id ? Number(data.classroom_id) : null;
+            try {
+                const r = isEdit
+                    ? await API.classes.update(id, data)
+                    : await API.classes.create(data);
+                if (r.success) {
+                    showToast(isEdit ? '班级已更新' : '班级已创建', 'success');
+                    if (isEdit) { currentClass = r.data; loadClassDetail(); }
+                    else { location.hash = '#/classes/' + r.data.id; }
+                } else showToast('保存失败：' + (r.error || '未知错误'), 'error');
+            } catch (e) { showToast('保存失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+/* ---------- 添加 / 移除学生 ---------- */
+function showAddStudentModal() {
+    if (!allStudents.length) { showToast('暂无可添加的学生', 'info'); return; }
+    // 过滤已在本班的学生
+    const inClass = new Set((currentClass.students || []).map(s => s.student_id));
+    const options = allStudents.filter(s => s.status === 'active' && !inClass.has(s.id))
+        .map(s => ({ v: s.id, label: `${s.name}${s.grade ? '（' + s.grade + '）' : ''}` }));
+    if (!options.length) { showToast('所有在读学生均已在班级中', 'info'); return; }
+    Utils.showModal({
+        title: '添加学生',
+        subtitle: '小班可多选学生（一对一班级仅能选 1 名）',
+        width: 520,
+        fields: [
+            { key: 'student_id', label: '选择学生', type: 'select', options, required: true },
+        ],
+        onSubmit: async (data) => {
+            try {
+                const r = await API.classes.addStudent(currentClass.id, { student_id: Number(data.student_id) });
+                if (r.success) {
+                    showToast('学生已添加', 'success');
+                    const n = r.data.student_active_class_count;
+                    if (n > 1) showToast(`该生当前在 ${n} 个在读班级中（排课后将做时间冲突检测）`, 'info');
+                    loadClassDetail();
+                } else showToast('添加失败：' + (r.error || '未知错误'), 'error');
+            } catch (e) { showToast('添加失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+async function removeStudent(studentId) {
+    const stu = (currentClass.students || []).find(s => s.student_id === studentId);
+    Utils.confirmDialog({
+        title: '移出学生',
+        message: `确定将「${stu ? stu.name : ''}」移出该班级？`,
+        danger: true,
+        onOk: async () => {
+            try {
+                const r = await API.classes.removeStudent(currentClass.id, studentId);
+                if (r.success) { showToast('已移出', 'success'); loadClassDetail(); }
+                else showToast('操作失败：' + (r.error || '未知错误'), 'error');
+            } catch (e) { showToast('操作失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+/* ---------- 停用 / 启用 / 删除 ---------- */
+async function toggleClassStatus(id) {
+    const c = currentClass;
+    const next = c.status === 'active' ? 'paused' : 'active';
+    try {
+        const r = await API.classes.updateStatus(id, next);
+        if (r.success) { showToast(next === 'paused' ? '班级已停用（数据保留）' : '班级已启用', 'success'); loadClassDetail(); }
+        else showToast('操作失败：' + (r.error || ''), 'error');
+    } catch (e) { showToast('操作失败：' + e.message, 'error'); }
+}
+
+function deleteClass(id) {
+    Utils.confirmDialog({
+        title: '删除班级',
+        message: `确定删除班级「${currentClass ? currentClass.name : ''}」？将同时移出所有学生与排课安排，不可恢复。`,
+        danger: true,
+        onOk: async () => {
+            try {
+                const r = await API.classes.delete(id);
+                if (r.success) { showToast('已删除', 'success'); location.hash = '#/classes'; }
+                else showToast('删除失败：' + (r.error || ''), 'error');
+            } catch (e) { showToast('删除失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+/* ---------- 初始化 ---------- */
+window.currentClassId = classId;  // 供内联 onclick 使用（编辑/停用/删除）
+loadBaseData();
+if (classId) { loadClassDetail(); } else { loadClasses(); }
+window.currentPageRefresh = classId ? loadClassDetail : loadClasses;
+
+Object.assign(window, {
+    loadClasses, openClassDetail, showClassModal, showAddStudentModal,
+    removeStudent, toggleClassStatus, deleteClass,
+});
+})();
+</script>

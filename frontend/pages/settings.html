@@ -5,6 +5,7 @@
         <button class="settings-tab active" data-tab="ai" onclick="switchSettingsTab('ai')"><svg class="icon"><use href="#icon-bot"/></svg> AI 配置</button>
         <button class="settings-tab" data-tab="org" onclick="switchSettingsTab('org')"><svg class="icon"><use href="#icon-building"/></svg> 机构信息</button>
         <button class="settings-tab" data-tab="data" onclick="switchSettingsTab('data')"><svg class="icon"><use href="#icon-database"/></svg> 数据管理</button>
+        <button class="settings-tab" data-tab="classrooms" onclick="switchSettingsTab('classrooms')"><svg class="icon"><use href="#icon-building"/></svg> 教室管理</button>
         <button class="settings-tab" data-tab="about" onclick="switchSettingsTab('about')"><svg class="icon"><use href="#icon-info-circle"/></svg> 关于</button>
     </div>
 
@@ -187,6 +188,23 @@
                 备份文件保存在 <code class="text-gray-400">data/backups/</code> 目录。<br>
                 如需恢复：关闭程序 → 用备份文件替换 <code class="text-gray-400">data/tutoring.db</code> → 重新启动。
             </div>
+        </div>
+    </div>
+
+    <!-- ============ 教室管理 ============ -->
+    <div id="settings-tab-classrooms" class="settings-tab-panel hidden">
+        <div class="panel">
+            <div class="flex items-center justify-between mb-3">
+                <div class="panel-title"><svg class="icon"><use href="#icon-building"/></svg> 教室管理 <span class="text-xs font-normal text-gray-400">排课资源 · 容量自动匹配班级人数</span></div>
+                <button onclick="showClassroomModal()" class="btn-primary" style="padding:6px 14px;font-size:13px;">
+                    <svg class="icon icon--md"><use href="#icon-plus"/></svg> 新增教室
+                </button>
+            </div>
+            <div class="mb-3 p-3 rounded-lg text-xs bg-indigo-50 text-indigo-600 border border-indigo-100 inline-flex items-start gap-1.5">
+                <svg class="icon icon--sm flex-shrink-0 mt-0.5"><use href="#icon-info"/></svg>
+                教室是智能排课（P3）的硬资源：同一教室同一时段只能上一门课。容量建议 ≥ 班级人数。
+            </div>
+            <div id="classrooms-list" class="text-center py-8 text-gray-300 text-sm">加载中...</div>
         </div>
     </div>
 
@@ -518,6 +536,80 @@ async function backupNow() {
     } catch (e) { showToast('备份失败：' + e.message, 'error'); }
 }
 
+/* ---------- 教室管理 ---------- */
+let classroomCache = [];
+async function loadClassrooms() {
+    const box = document.getElementById('classrooms-list');
+    if (!box) return;
+    try {
+        const r = await API.classrooms.list();
+        classroomCache = (r.success && r.data) ? r.data : [];
+        if (!classroomCache.length) {
+            box.innerHTML = '<div class="text-gray-300 text-sm">暂无教室，点击右上角「新增教室」添加</div>';
+            return;
+        }
+        box.innerHTML = `<div class="divide-y" style="border-color:#f1f5f9;">` + classroomCache.map(c => `
+            <div class="flex items-center justify-between py-2.5 flex-wrap gap-2">
+                <div class="flex items-center gap-2.5 flex-wrap">
+                    <span class="font-medium text-gray-800 text-sm">${Utils.escapeHtml(c.name)}</span>
+                    <span class="badge badge--info">${c.capacity} 人</span>
+                    ${c.location ? `<span class="text-xs text-gray-400">${Utils.escapeHtml(c.location)}</span>` : ''}
+                    ${c.status === 'paused' ? '<span class="text-xs text-gray-400">（已停用）</span>' : ''}
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="showClassroomModal(${c.id})" class="text-indigo-500 hover:text-indigo-700 text-xs">编辑</button>
+                    <button onclick="deleteClassroom(${c.id})" class="text-red-400 hover:text-red-600 text-xs">删除</button>
+                </div>
+            </div>`).join('') + `</div>`;
+    } catch (e) {
+        box.innerHTML = `<div class="text-red-400 text-sm">加载失败：${Utils.escapeHtml(e.message)}</div>`;
+    }
+}
+
+function showClassroomModal(id) {
+    let values = {};
+    if (id) {
+        const c = classroomCache.find(x => x.id === id);
+        if (c) values = { name: c.name, capacity: c.capacity, location: c.location, notes: c.notes };
+    }
+    Utils.showModal({
+        title: id ? '编辑教室' : '新增教室',
+        subtitle: '教室是排课资源：同一教室同一时段只能上一门课，容量需 ≥ 班级人数',
+        width: 520,
+        columns: 2,
+        fields: [
+            { key: 'name', label: '教室名称', required: true, placeholder: '如：A栋101', section: '基本信息' },
+            { key: 'capacity', label: '容量(人)', type: 'number', min: 1, default: 10, section: '基本信息' },
+            { key: 'location', label: '位置', placeholder: '如：1楼', section: '基本信息' },
+            { key: 'notes', label: '备注', type: 'textarea', rows: 2, placeholder: '选填', section: '其他', full: true },
+        ],
+        values,
+        onSubmit: async (data) => {
+            data.capacity = Number(data.capacity || 10);
+            try {
+                const r = id ? await API.classrooms.update(id, data) : await API.classrooms.create(data);
+                if (r.success) { showToast(id ? '教室已更新' : '教室已添加', 'success'); loadClassrooms(); }
+                else showToast('保存失败：' + (r.error || '未知错误'), 'error');
+            } catch (e) { showToast('保存失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+function deleteClassroom(id) {
+    Utils.confirmDialog({
+        title: '删除教室',
+        message: '确定删除该教室？若已被班级引用将无法删除。',
+        danger: true,
+        onOk: async () => {
+            try {
+                const r = await API.classrooms.delete(id);
+                if (r.success) { showToast('已删除', 'success'); loadClassrooms(); }
+                else showToast('删除失败：' + (r.error || ''), 'error');
+            } catch (e) { showToast('删除失败：' + e.message, 'error'); }
+        },
+    });
+}
+
 /* ---------- 工具 ---------- */
 function switchSettingsTab(name) {
     document.querySelectorAll('.settings-tab').forEach(b => {
@@ -526,6 +618,7 @@ function switchSettingsTab(name) {
     document.querySelectorAll('.settings-tab-panel').forEach(p => p.classList.add('hidden'));
     const el = document.getElementById('settings-tab-' + name);
     if (el) el.classList.remove('hidden');
+    if (name === 'classrooms') loadClassrooms();  // 进入教室 Tab 时加载列表
 }
 
 function toggleKey(inputId, btn) {
@@ -543,6 +636,7 @@ Object.assign(window, {
     switchSettingsTab, toggleKey, onLLMProviderChange, onEmbProviderChange,
     saveOrg, handleOrgLogo, clearOrgLogo, loadOrg,
     loadBackups, backupNow,
+    loadClassrooms, showClassroomModal, deleteClassroom,
 });
 })();
 </script>

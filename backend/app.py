@@ -10,7 +10,8 @@ from backend.models import init_db
 from backend.routers import (
     students, subjects, conversations, reports,
     scores, course_plans, communication_logs,
-    teachers, knowledge_base, settings, dashboard
+    teachers, knowledge_base, settings, dashboard,
+    classes, classrooms
 )
 from config import FRONTEND_DIR
 
@@ -57,6 +58,8 @@ def create_app() -> FastAPI:
     app.include_router(knowledge_base.qa_router)
     app.include_router(settings.router)
     app.include_router(dashboard.router)
+    app.include_router(classes.router)
+    app.include_router(classrooms.router)
 
     # 静态文件（前端）
     frontend_path = Path(FRONTEND_DIR)

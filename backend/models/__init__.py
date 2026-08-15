@@ -24,6 +24,11 @@ MIGRATION_RULES = {
             "index_error": "VARCHAR DEFAULT ''",
         }
     },
+    "classes": {
+        "cols": {
+            "subject_name": "VARCHAR DEFAULT ''",
+        }
+    },
 }
 
 
@@ -41,6 +46,9 @@ def init_db():
     from backend.models.qa_history import QaHistory
     from backend.models.setting import Setting
     from backend.models.activity_log import ActivityLog
+    from backend.models.classroom import Classroom
+    from backend.models.class_ import Class
+    from backend.models.class_student import ClassStudent
     Base.metadata.create_all(bind=engine)
     run_light_migrations(engine, MIGRATION_RULES)
 
