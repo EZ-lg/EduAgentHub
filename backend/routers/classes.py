@@ -14,6 +14,7 @@ from backend.models.teacher import Teacher
 from backend.models.classroom import Classroom
 from backend.utils.activity import log_activity
 from backend.utils.helpers import success_response, now_iso
+from backend.services.term_schedule import compute_end_date, check_term_conflicts
 
 router = APIRouter(prefix="/api/classes", tags=["classes"])
 
@@ -50,12 +51,14 @@ def _class_detail(db: Session, cls: Class) -> dict:
 
 
 @router.get("")
-def list_classes(status: str = "", subject_id: int = None, teacher_id: int = None,
-                 search: str = "", db: Session = Depends(get_db)):
-    """班级列表（筛选：状态/学科/教师/名称搜索），含人数与关联名称"""
+def list_classes(status: str = "", term_type: str = "", subject_id: int = None,
+                 teacher_id: int = None, search: str = "", db: Session = Depends(get_db)):
+    """班级列表（筛选：状态/上课模式/学科/教师/名称搜索），含人数与关联名称"""
     query = db.query(Class)
     if status in ("active", "paused"):
         query = query.filter(Class.status == status)
+    if term_type in ("semester", "summer_winter"):
+        query = query.filter(Class.term_type == term_type)
     if subject_id:
         query = query.filter(Class.subject_id == subject_id)
     if teacher_id:
@@ -76,6 +79,20 @@ def create_class(data: dict, db: Session = Depends(get_db)):
     if class_type not in ("1v1", "1vN"):
         raise HTTPException(status_code=400, detail="班型应为 1v1 或 1vN")
 
+    term_type = data.get("term_type", "semester")
+    if term_type not in ("semester", "summer_winter"):
+        raise HTTPException(status_code=400, detail="班型应为 semester（学期）或 summer_winter（寒暑假）")
+    total_lessons = int(data.get("total_lessons") or 0)
+    daily_start = data.get("daily_start", "")
+    daily_end = data.get("daily_end", "")
+
+    # 寒暑假班：班期自动计算（start + 总天数跳过周日）+ 必填校验
+    end_date = data.get("end_date", "")
+    if term_type == "summer_winter":
+        if not data.get("start_date") or not daily_start or not daily_end or total_lessons <= 0:
+            raise HTTPException(status_code=400, detail="寒暑假班需填写：开始日期、每天时段、总课次（天数）")
+        end_date = compute_end_date(data["start_date"], total_lessons)
+
     cls = Class(
         name=name,
         subject_id=data.get("subject_id"),
@@ -83,10 +100,14 @@ def create_class(data: dict, db: Session = Depends(get_db)):
         teacher_id=data.get("teacher_id"),
         classroom_id=data.get("classroom_id"),
         class_type=class_type,
+        term_type=term_type,
+        total_lessons=total_lessons,
+        daily_start=daily_start,
+        daily_end=daily_end,
         weekly_frequency=data.get("weekly_frequency", 2),
         duration_minutes=data.get("duration_minutes", 120),
         start_date=data.get("start_date", ""),
-        end_date=data.get("end_date", ""),
+        end_date=end_date,
         notes=data.get("notes", ""),
     )
     db.add(cls)
@@ -103,6 +124,15 @@ def create_class(data: dict, db: Session = Depends(get_db)):
         db.add(ClassStudent(class_id=cls.id, student_id=sid,
                             subject_id=data.get("subject_id") if class_type == "1v1" else None))
         log_activity(db, "加入班级", f"学生加入班级「{cls.name}」", student_id=sid)
+
+    # 寒暑假班班期冲突校验
+    if term_type == "summer_winter":
+        db.flush()  # autoflush=False：学生记录需显式 flush 才可见，否则冲突检测漏检学生
+        conflicts = check_term_conflicts(db, cls.id)
+        if conflicts:
+            db.rollback()
+            raise HTTPException(status_code=400,
+                                detail={"message": "班期存在时间冲突", "conflicts": conflicts})
 
     log_activity(db, "新建班级", f"班级「{cls.name}」")
     db.commit()
@@ -136,9 +166,25 @@ def update_class(class_id: int, data: dict, db: Session = Depends(get_db)):
                 raise HTTPException(status_code=400, detail="该班已有超过 1 名学生，无法改为一对一")
         cls.class_type = data["class_type"]
     for field in ["subject_id", "subject_name", "teacher_id", "classroom_id",
+                  "term_type", "total_lessons", "daily_start", "daily_end",
                   "weekly_frequency", "duration_minutes", "start_date", "end_date", "notes"]:
         if field in data and data[field] is not None:
             setattr(cls, field, data[field])
+    if cls.total_lessons is None:
+        cls.total_lessons = 0
+
+    # 寒暑假班：班期自动计算 + 冲突校验
+    if cls.term_type == "summer_winter":
+        if not cls.start_date or not cls.daily_start or not cls.daily_end or not cls.total_lessons:
+            raise HTTPException(status_code=400, detail="寒暑假班需填写：开始日期、每天时段、总课次（天数）")
+        cls.end_date = compute_end_date(cls.start_date, cls.total_lessons)
+        db.flush()
+        conflicts = check_term_conflicts(db, cls.id)
+        if conflicts:
+            db.rollback()
+            raise HTTPException(status_code=400,
+                                detail={"message": "班期存在时间冲突", "conflicts": conflicts})
+
     cls.updated_at = now_iso()
     log_activity(db, "编辑班级", f"班级「{cls.name}」")
     db.commit()
@@ -239,6 +285,48 @@ def remove_student_from_class(class_id: int, student_id: int, db: Session = Depe
     db.delete(cs)
     db.commit()
     return success_response({"deleted": True})
+
+
+@router.post("/{class_id}/extend")
+def extend_class(class_id: int, data: dict, db: Session = Depends(get_db)):
+    """寒暑假班续课：默认同时段追加天数；若续课后班期新增日期内该时段/教室被占用 → 报冲突提示重新排课"""
+    cls = db.query(Class).filter(Class.id == class_id).first()
+    if not cls:
+        raise HTTPException(status_code=404, detail="班级不存在")
+    if cls.term_type != "summer_winter":
+        raise HTTPException(status_code=400, detail="仅寒暑假班支持续课")
+
+    new_total = int(data.get("new_total") or data.get("total_lessons") or 0)
+    if new_total <= cls.total_lessons:
+        return success_response({
+            "extended": False,
+            "message": f"续课后总课次需大于当前 {cls.total_lessons} 天（当前结束 {cls.end_date}）",
+        })
+
+    # 模拟续课：更新 total_lessons/end_date 后做班期冲突校验
+    old_end = cls.end_date
+    cls.total_lessons = new_total
+    cls.end_date = compute_end_date(cls.start_date, new_total)
+    db.flush()
+    conflicts = check_term_conflicts(db, cls.id)
+    if conflicts:
+        db.rollback()
+        return success_response({
+            "extended": False,
+            "conflicts": conflicts,
+            "message": "续课后新增时段已被占用（教室/教师/学生冲突），需先重新排课",
+        })
+
+    cls.updated_at = now_iso()
+    log_activity(db, "班级续课", f"班级「{cls.name}」续课至 {new_total} 次（结束 {cls.end_date}）")
+    db.commit()
+    db.refresh(cls)
+    return success_response({
+        "extended": True,
+        "new_total": cls.total_lessons,
+        "end_date": cls.end_date,
+        "message": f"续课成功，总课次 {cls.total_lessons}，结束日期 {cls.end_date}",
+    })
 
 
 @router.post("/from-subject/{subject_id}")

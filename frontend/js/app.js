@@ -169,6 +169,10 @@ const routes = [
         props: true,
     },
     {
+        path: '/schedule',
+        component: createPageComponent('schedule', '课表'),
+    },
+    {
         path: '/teachers',
         component: createPageComponent('teachers', '教师管理'),
     },

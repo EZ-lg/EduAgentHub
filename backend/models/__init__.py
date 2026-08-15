@@ -27,6 +27,10 @@ MIGRATION_RULES = {
     "classes": {
         "cols": {
             "subject_name": "VARCHAR DEFAULT ''",
+            "term_type": "VARCHAR DEFAULT 'semester'",
+            "total_lessons": "INTEGER DEFAULT 0",
+            "daily_start": "VARCHAR DEFAULT ''",
+            "daily_end": "VARCHAR DEFAULT ''",
         }
     },
 }
@@ -49,6 +53,7 @@ def init_db():
     from backend.models.classroom import Classroom
     from backend.models.class_ import Class
     from backend.models.class_student import ClassStudent
+    from backend.models.class_schedule import ClassSchedule
     Base.metadata.create_all(bind=engine)
     run_light_migrations(engine, MIGRATION_RULES)
 

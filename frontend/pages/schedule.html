@@ -1,0 +1,160 @@
+<!-- 课表功能栏 — P4：日期选择 + 教室×时段网格（参考暑假课程表） -->
+<div class="fade-in">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+            <svg class="icon icon--md text-indigo-500"><use href="#icon-calendar"/></svg>
+            课表 <span class="text-xs text-gray-400 font-normal" id="sched-title"></span>
+        </h2>
+        <div class="flex gap-2 items-center flex-wrap">
+            <input type="date" id="sched-date" onchange="loadDaySchedule()"
+                   class="text-sm border rounded-lg py-1.5 px-2" style="border-color:#e2e8f0;">
+            <button onclick="goToday()" class="btn-outline" style="padding:6px 12px;font-size:13px;">
+                <svg class="icon icon--md"><use href="#icon-calendar"/></svg> 今天
+            </button>
+            <select id="sched-teacher" onchange="loadDaySchedule()" class="text-sm border rounded-lg py-1.5 px-2" style="border-color:#e2e8f0;">
+                <option value="">全部教师</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="sched-summary" class="text-xs text-gray-400 mb-2"></div>
+
+    <div class="panel overflow-x-auto">
+        <div id="sched-grid">
+            <div class="text-center py-10 text-gray-300">加载中...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+/* ---------- 状态 ---------- */
+let periods = [];
+let rooms = [];
+let teacherList = [];
+
+const WEEK_NAMES = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+function esc(s) { return Utils.escapeHtml(String(s ?? '')); }
+
+function fmtDate(d) {
+    const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+/* ---------- 初始化 ---------- */
+async function initSchedule() {
+    // 日期默认今天
+    const today = new Date();
+    document.getElementById('sched-date').value = fmtDate(today);
+    try {
+        const [p, c, t] = await Promise.all([API.schedules.periods(), API.classrooms.list(), API.teachers.list()]);
+        periods = (p.success && p.data) ? p.data : [];
+        rooms = ((c.success && c.data) || []).filter(r => r.status === 'active');
+        teacherList = (t.success && t.data) ? t.data : [];
+    } catch (e) { /* 基础数据失败不阻塞 */ }
+    const sel = document.getElementById('sched-teacher');
+    sel.innerHTML = '<option value="">全部教师</option>' + teacherList.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
+    loadDaySchedule();
+}
+
+function goToday() {
+    document.getElementById('sched-date').value = fmtDate(new Date());
+    loadDaySchedule();
+}
+
+/* ---------- 当天课表 ---------- */
+async function loadDaySchedule() {
+    const date = document.getElementById('sched-date').value;
+    const teacherId = document.getElementById('sched-teacher').value;
+    const grid = document.getElementById('sched-grid');
+    const summary = document.getElementById('sched-summary');
+    if (!date) { showToast('请选择日期', 'info'); return; }
+
+    // 标题：X月X日 星期X
+    const d = new Date(date + 'T00:00:00');
+    document.getElementById('sched-title').textContent = `${d.getMonth() + 1}月${d.getDate()}日 ${WEEK_NAMES[d.getDay() === 0 ? 6 : d.getDay() - 1]}`;
+    grid.innerHTML = '<div class="text-center py-10 text-gray-300">加载中...</div>';
+
+    try {
+        const r = await API.schedules.day(date);
+        if (!r.success) throw new Error(r.error || '加载失败');
+        let items = (r.data && r.data.items) || [];
+        if (teacherId) items = items.filter(it => String(it.teacher_id) === teacherId);
+
+        summary.textContent = `今天共 ${items.length} 节课` + (items.length ? ` · ${items.map(it => it.class_name).join('、')}` : '');
+
+        if (!periods.length || !rooms.length) {
+            grid.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">请先在「设置 → 教室管理」添加教室（时段为系统默认节次）</div>';
+            return;
+        }
+        if (!items.length) {
+            grid.innerHTML = `<div class="text-center py-12">
+                <div class="empty-icon mx-auto mb-3"><svg class="icon"><use href="#icon-calendar"/></svg></div>
+                <div class="empty-title">当天暂无排课</div>
+                <div class="empty-desc">${date} 没有已确认的上课安排</div>
+            </div>`;
+            return;
+        }
+
+        renderGrid(items);
+    } catch (e) {
+        grid.innerHTML = `<div class="text-red-400 text-sm py-8 text-center">加载失败：${esc(e.message)}</div>`;
+    }
+}
+
+/* ---------- 渲染 教室×时段 网格 ---------- */
+function renderGrid(items) {
+    const grid = document.getElementById('sched-grid');
+    // 列：时间 + 各教室 + 未指定教室
+    const cols = [{ id: null, name: '未指定教室' }].concat(rooms);
+    let html = '<table class="w-full text-sm" style="border-collapse:separate;border-spacing:0;min-width:800px;">';
+    // 表头
+    html += '<thead><tr>';
+    html += `<th style="background:#fb923c;color:#fff;padding:8px 10px;font-weight:600;min-width:130px;position:sticky;left:0;">时间</th>`;
+    cols.forEach(c => {
+        html += `<th style="background:#fb923c;color:#fff;padding:8px 10px;font-weight:600;min-width:140px;">${esc(c.name)}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+
+    // 行：每个时段
+    periods.forEach((p, i) => {
+        const odd = i % 2 === 1;
+        html += `<tr>`;
+        // 时间列（绿色）
+        html += `<td style="background:${odd ? '#e8f5e9' : '#f0faf0'};padding:8px 10px;font-weight:600;color:#2f855a;position:sticky;left:0;border-bottom:1px solid #e2e8f0;">
+            <div class="text-xs">${esc(p.label || ('第' + (i + 1) + '节'))}</div>
+            <div class="text-xs text-gray-600 num mt-0.5">${esc(p.start)}-${esc(p.end)}</div>
+        </td>`;
+        cols.forEach(c => {
+            const cellItems = items.filter(it => it.start_time === p.start && (it.classroom_id || null) === c.id);
+            html += `<td style="border-bottom:1px solid #e2e8f0;border-left:1px solid #f1f5f9;padding:6px 8px;vertical-align:top;min-height:56px;">`;
+            if (cellItems.length) {
+                cellItems.forEach(it => {
+                    const isTerm = it.term_type === 'summer_winter';
+                    const st = isTerm ? 'background:#fdf2f8;border-color:#fbcfe8;' : 'background:#eef2ff;border-color:#c7d2fe;';
+                    const students = (it.students || []).map(s => s.name).join(' ');
+                    html += `<div class="rounded-md border px-2 py-1.5 mb-1" style="${st}">
+                        <div class="text-xs font-semibold text-gray-800">${esc(it.class_name)}${isTerm ? ' <span class="badge badge--warning" style="font-size:10px;padding:0 4px;">暑假</span>' : ''}</div>
+                        ${it.start_time !== it.end_time && it.end_time !== p.end ? `<div class="text-[11px] text-gray-500 num">${esc(it.start_time)}-${esc(it.end_time)}</div>` : ''}
+                        <div class="text-[11px] text-gray-500">👨‍🏫 ${esc(it.teacher_name || '未指派')}</div>
+                        ${students ? `<div class="text-[11px] text-gray-400 truncate" title="${esc(students)}">👥 ${esc(students)}</div>` : ''}
+                    </div>`;
+                });
+            }
+            html += `</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    grid.innerHTML = html;
+}
+
+/* ---------- 注册刷新 ---------- */
+window.currentPageRefresh = loadDaySchedule;
+initSchedule();
+
+Object.assign(window, {
+    loadDaySchedule, goToday,
+});
+})();
+</script>

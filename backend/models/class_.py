@@ -24,7 +24,12 @@ class Class(Base):
     teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="SET NULL"), nullable=True)
     classroom_id = Column(Integer, ForeignKey("classrooms.id", ondelete="SET NULL"), nullable=True)
     class_type = Column(String, default="1vN")  # 1v1 / 1vN
-    weekly_frequency = Column(Integer, default=2)      # 每周课次
+    # 班型模式：semester=学期跟班（每周固定 N 次循环） / summer_winter=寒暑假班（每天固定 1 节，周日休息，总天数 N）
+    term_type = Column(String, default="semester")
+    total_lessons = Column(Integer, default=0)   # 寒暑假班总课次（天数）；学期班为 0
+    daily_start = Column(String, default="")     # 寒暑假班每天固定开始时间 "HH:MM"
+    daily_end = Column(String, default="")       # 寒暑假班每天固定结束时间 "HH:MM"
+    weekly_frequency = Column(Integer, default=2)      # 学期班每周课次
     duration_minutes = Column(Integer, default=120)    # 单次时长（分钟）
     start_date = Column(String, default="")
     end_date = Column(String, default="")
@@ -42,6 +47,10 @@ class Class(Base):
             "teacher_id": self.teacher_id,
             "classroom_id": self.classroom_id,
             "class_type": self.class_type,
+            "term_type": self.term_type,
+            "total_lessons": self.total_lessons,
+            "daily_start": self.daily_start,
+            "daily_end": self.daily_end,
             "weekly_frequency": self.weekly_frequency,
             "duration_minutes": self.duration_minutes,
             "start_date": self.start_date,

@@ -130,6 +130,24 @@ window.API = {
         addStudent(id, data) { return API.post(`/api/classes/${id}/students`, data); },
         removeStudent(id, sid) { return API.delete(`/api/classes/${id}/students/${sid}`); },
         createFromSubject(subjectId, data) { return API.post(`/api/classes/from-subject/${subjectId}`, data || {}); },
+        extend(id, data) { return API.post(`/api/classes/${id}/extend`, data); },
+    },
+
+    // === 排课 / 课表（2.0 P3）===
+    schedules: {
+        periods() { return API.get('/api/schedules/periods'); },
+        updatePeriods(periods) { return API.put('/api/schedules/periods', { periods }); },
+        weekly(params = {}) {
+            const qs = new URLSearchParams(params).toString();
+            return API.get(`/api/schedules/weekly?${qs}`);
+        },
+        day(date) { return API.get(`/api/schedules/day?date=${date}`); },
+        autoPlan(data) { return API.post('/api/schedules/auto-plan', data); },
+        confirm(data) { return API.post('/api/schedules/confirm', data); },
+        check(data) { return API.post('/api/schedules/check', data); },
+        add(data) { return API.post('/api/schedules', data); },
+        update(id, data) { return API.put(`/api/schedules/${id}`, data); },
+        delete(id) { return API.delete(`/api/schedules/${id}`); },
     },
 
     // === 知识库 ===
