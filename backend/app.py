@@ -19,7 +19,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="教培智能体",
         description="教培机构一站式学员管理及AI助学工具",
-        version="1.0.0"
+        version="2.0.0"
     )
 
     # CORS

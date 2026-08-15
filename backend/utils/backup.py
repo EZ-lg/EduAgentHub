@@ -12,11 +12,16 @@ import shutil
 import sqlite3
 from datetime import datetime
 
-from config import DB_PATH, DATA_DIR
+from config import DB_PATH, DATA_DIR, DATABASE_URL
 
 BACKUP_DIR = os.path.join(DATA_DIR, "backups")
 MAX_BACKUPS = 14
 GLOB_PATTERN = "tutoring-*.db"
+
+
+def _is_sqlite() -> bool:
+    """当前数据库是否为 SQLite（非 SQLite 时跳过 sqlite3 备份，服务器切库后另实现）"""
+    return DATABASE_URL.split(":", 1)[0].split("+", 1)[0].lower() == "sqlite"
 
 
 def _ensure_dir():
@@ -25,6 +30,8 @@ def _ensure_dir():
 
 def backup_database() -> str:
     """执行一次备份，返回备份文件路径；失败返回 None（不抛异常，不阻塞启动）"""
+    if not _is_sqlite():
+        return None  # 非 SQLite（如服务器切 PostgreSQL）时跳过，备份策略另行实现
     _ensure_dir()
     if not os.path.exists(DB_PATH):
         return None

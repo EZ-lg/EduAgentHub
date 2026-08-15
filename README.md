@@ -82,7 +82,8 @@ venv/Scripts/python.exe -m PyInstaller build/build.spec --noconfirm
 │   ├── pages/               # 9 个页面模板
 │   ├── components/          # 侧边栏 + SVG 图标库
 │   └── vendor/              # 本地化库（Vue/Router/ECharts/jsPDF 等）
-├── docs/1.0开发事项.md       # 1.0 开发完整记录（需求+交接文档归档汇总）
+├── docs/                     # 文档归档（1.0需求基线 + 1.0开发事项）
+├── deploy/                   # 服务器部署（Dockerfile / nginx / 部署指南）
 ├── build/
 │   ├── build.spec           # PyInstaller 打包配置
 │   └── tailwind-input.css
@@ -107,9 +108,11 @@ venv/Scripts/python.exe -m PyInstaller build/build.spec --noconfirm
 
 ## 📚 文档
 
-- **需求文档**：`需求文档与设计方案.md`
+- **2.0 需求文档**：`需求文档与设计方案2.md`（班级管理 / 智能排课 / 全局总览 / 可迁移双轨）
+- **1.0 需求文档**：`docs/需求文档与设计方案.md`（1.0 需求基线）
 - **1.0 开发事项**：`docs/1.0开发事项.md`（P1~P9 完成记录 + 架构决策 + 开发纪律 + 遗留项）
+- **部署指南**：`deploy/deploy.md`（服务器双轨形态）
 
 ---
 
-**v1.0.0 · P1~P9 全功能版** | 本地运行 · 数据不出电脑
+**v2.0（开发中）· P1 可迁移化已完成** | 本地运行 · 数据不出电脑 · 可迁移服务器

@@ -18,13 +18,13 @@ if sys.stdout is None:
 if sys.stderr is None:
     sys.stderr = open(os.devnull, 'w', encoding='utf-8')
 
-from config import DEFAULT_PORT, HOST
+from config import PORT, HOST
 # 强制导入 backend.app，确保 PyInstaller 收集整个 backend 包
 # （下方 uvicorn.run 的 "backend.app:app" 是字符串，静态分析无法识别该依赖，不 import 打包后会缺 backend）
 from backend.app import app  # noqa: F401
 
 
-def find_free_port(start: int = DEFAULT_PORT) -> int:
+def find_free_port(start: int = PORT) -> int:
     """自动查找可用端口"""
     port = start
     while port < start + 100:
