@@ -82,7 +82,7 @@ venv/Scripts/python.exe -m PyInstaller build/build.spec --noconfirm
 │   ├── pages/               # 9 个页面模板
 │   ├── components/          # 侧边栏 + SVG 图标库
 │   └── vendor/              # 本地化库（Vue/Router/ECharts/jsPDF 等）
-├── docs/交接文档/            # P1~P7 阶段交接文档
+├── docs/1.0开发事项.md       # 1.0 开发完整记录（需求+交接文档归档汇总）
 ├── build/
 │   ├── build.spec           # PyInstaller 打包配置
 │   └── tailwind-input.css
@@ -108,7 +108,7 @@ venv/Scripts/python.exe -m PyInstaller build/build.spec --noconfirm
 ## 📚 文档
 
 - **需求文档**：`需求文档与设计方案.md`
-- **交接文档**：`docs/交接文档/P1~P7交接文档.md`
+- **1.0 开发事项**：`docs/1.0开发事项.md`（P1~P9 完成记录 + 架构决策 + 开发纪律 + 遗留项）
 
 ---
 
