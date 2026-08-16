@@ -90,25 +90,49 @@ window.Utils = {
      *   onSubmit(result): 点确定后回调，result 为 {key: value}
      */
     showModal(opts) {
-        const { title = '', subtitle = '', fields = [], values = {}, onSubmit, width = 520, columns = 1, bodyHtml = null, hideOk = false } = opts;
+        const { title = '', subtitle = '', fields = [], values = {}, onSubmit, width = 520, columns = 1, bodyHtml = null, hideOk = false, renderOn = [] } = opts;
         document.querySelector('.ta-modal-mask')?.remove();
 
         const mask = document.createElement('div');
         mask.className = 'ta-modal-mask';
-
         const panel = document.createElement('div');
         panel.className = 'ta-modal-panel';
         panel.style.width = width + 'px';
+        mask.appendChild(panel);
+        document.body.appendChild(mask);
 
-        // 渲染字段；支持 section 分组标题、full 占整行、columns 两列
-        let fieldHtml = '', lastSection = '';
+        // 初始值（含 default）
+        const initial = {};
         fields.forEach(f => {
-            const val = (values[f.key] !== undefined && values[f.key] !== null) ? values[f.key] : (f.default || '');
-            const req = f.required ? '<span class="text-red-400 ml-1">*</span>' : '';
+            initial[f.key] = (values[f.key] !== undefined && values[f.key] !== null) ? values[f.key] : (f.default || '');
+        });
+        let currentValues = {};
+
+        // 字段是否显示：showWhen {key, value} → 仅当 key 当前值 === value 时显示（如 term_type 联动）
+        function fieldVisible(f) {
+            if (!f.showWhen) return true;
+            const cur = (currentValues[f.showWhen.key] !== undefined) ? currentValues[f.showWhen.key] : initial[f.showWhen.key];
+            return String(cur) === String(f.showWhen.value);
+        }
+
+        // 从当前 DOM 收集所有字段值
+        function collectValues() {
+            const result = {};
+            for (const f of fields) {
+                const el = mask.querySelector(`[data-key="${f.key}"]`);
+                if (!el) continue;
+                let v = el.value;
+                if (f.type === 'multi-select') v = Array.from(el.querySelectorAll('input[type="checkbox"]:checked')).map(c => c.value);
+                else if (f.type === 'number') v = (v === '' || v === null) ? '' : Number(v);
+                result[f.key] = v;
+            }
+            return result;
+        }
+
+        function fieldInputHtml(f, val) {
             let input = '';
             if (f.type === 'select') {
                 const opts = (f.options || []).map(o => {
-                    // 选项支持 {v, label} 或 {value, label} 两种写法
                     const ov = (typeof o === 'object') ? (o.v !== undefined ? o.v : o.value) : o;
                     const ol = (typeof o === 'object') ? (o.label !== undefined ? o.label : ov) : o;
                     const sel = String(ov) === String(val) ? 'selected' : '';
@@ -116,7 +140,6 @@ window.Utils = {
                 }).join('');
                 input = `<select class="w-full" data-key="${f.key}">${opts}</select>`;
             } else if (f.type === 'multi-select') {
-                // 多选（checkbox 组），收集结果为字符串数组，适合存 JSON 数组
                 const cur = Array.isArray(val) ? val.map(String) : [];
                 const opts = (f.options || []).map(o => {
                     const ov = (typeof o === 'object') ? (o.v !== undefined ? o.v : o.value) : o;
@@ -132,76 +155,80 @@ window.Utils = {
                 const minAttr = f.type === 'number' && f.min !== undefined ? ` min="${f.min}"` : '';
                 input = `<input type="${t}" class="w-full" value="${Utils.escapeHtml(String(val))}" placeholder="${Utils.escapeHtml(f.placeholder || '')}" data-key="${f.key}"${minAttr}>`;
             }
+            const req = f.required ? '<span class="text-red-400 ml-1">*</span>' : '';
             const span = (columns === 2 && !f.full) ? '' : ' col-span-2';
-            const sectionHtml = (f.section && f.section !== lastSection)
-                ? `<div class="col-span-2 pt-2 mb-1 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b" style="border-color:#f1f5f9;">${Utils.escapeHtml(f.section)}</div>`
-                : '';
-            lastSection = f.section || lastSection;
-            fieldHtml += sectionHtml
-                + `<div class="mb-3${span}"><label class="settings-label">${Utils.escapeHtml(f.label)}${req}</label>${input}</div>`;
-        });
+            return `<div class="mb-3${span}" data-field="${f.key}"><label class="settings-label">${Utils.escapeHtml(f.label)}${req}</label>${input}</div>`;
+        }
 
-        // bodyHtml 优先（只读展示，如版本列表/预览），否则渲染 fields
-        const body = bodyHtml !== null
-            ? bodyHtml
-            : (columns === 2 ? `<div class="grid grid-cols-2 gap-x-4">${fieldHtml}</div>` : fieldHtml);
-
-        panel.innerHTML = `
-            <div class="ta-modal-head">
-                <div>
-                    <div class="font-semibold text-gray-800 text-sm">${Utils.escapeHtml(title)}</div>
-                    ${subtitle ? `<div class="text-xs text-gray-400 mt-0.5">${Utils.escapeHtml(subtitle)}</div>` : ''}
+        // 渲染（含条件字段过滤 + 联动重渲染），仅保留可见字段的分组标题
+        function render() {
+            const vals = collectValues();
+            currentValues = vals;
+            let fieldHtml = '', lastSection = '';
+            for (const f of fields) {
+                if (!fieldVisible(f)) continue;
+                const val = (vals[f.key] !== undefined && vals[f.key] !== null) ? vals[f.key] : (f.default || '');
+                if (f.section && f.section !== lastSection) {
+                    fieldHtml += `<div class="col-span-2 pt-2 mb-1 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b" style="border-color:#f1f5f9;">${Utils.escapeHtml(f.section)}</div>`;
+                    lastSection = f.section;
+                }
+                fieldHtml += fieldInputHtml(f, val);
+            }
+            const body = bodyHtml !== null
+                ? bodyHtml
+                : (columns === 2 ? `<div class="grid grid-cols-2 gap-x-4">${fieldHtml}</div>` : fieldHtml);
+            panel.innerHTML = `
+                <div class="ta-modal-head">
+                    <div>
+                        <div class="font-semibold text-gray-800 text-sm">${Utils.escapeHtml(title)}</div>
+                        ${subtitle ? `<div class="text-xs text-gray-400 mt-0.5">${Utils.escapeHtml(subtitle)}</div>` : ''}
+                    </div>
+                    <button class="text-gray-300 hover:text-gray-500 text-lg leading-none" data-close>
+                        <svg class="icon icon--sm"><use href="#icon-x"/></svg>
+                    </button>
                 </div>
-                <button class="text-gray-300 hover:text-gray-500 text-lg leading-none" data-close>
-                    <svg class="icon icon--sm"><use href="#icon-x"/></svg>
-                </button>
-            </div>
-            <div class="ta-modal-body">${body}</div>
-            <div class="ta-modal-foot">
-                <button class="btn-outline" data-close style="padding:7px 18px;">取消</button>
-                ${hideOk ? '' : '<button class="btn-primary" data-ok style="padding:7px 18px;">确定</button>'}
-            </div>
-        `;
-        mask.appendChild(panel);
-        document.body.appendChild(mask);
+                <div class="ta-modal-body">${body}</div>
+                <div class="ta-modal-foot">
+                    <button class="btn-outline" data-close style="padding:7px 18px;">取消</button>
+                    ${hideOk ? '' : '<button class="btn-primary" data-ok style="padding:7px 18px;">确定</button>'}
+                </div>
+            `;
+            attach();
+        }
 
-        const close = () => mask.remove();
-        mask.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', close));
-        mask.addEventListener('mousedown', (e) => { if (e.target === mask) close(); });
-
-        const okBtn = mask.querySelector('[data-ok]');
-        if (okBtn) okBtn.addEventListener('click', () => {
-            const result = {};
-            for (const f of fields) {
-                const el = mask.querySelector(`[data-key="${f.key}"]`);
-                let v = el ? el.value : '';
-                if (f.type === 'multi-select') {
-                    v = el ? Array.from(el.querySelectorAll('input[type="checkbox"]:checked')).map(c => c.value) : [];
-                } else if (f.type === 'number') {
-                    v = (v === '' || v === null) ? '' : Number(v);
+        function attach() {
+            mask.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', close));
+            mask.addEventListener('mousedown', (e) => { if (e.target === mask) close(); });
+            // 联动重渲染：renderOn 中的 key 变化时重建表单（保留其它字段已填值）
+            for (const key of renderOn) {
+                const el = mask.querySelector(`[data-key="${key}"]`);
+                if (el) el.addEventListener('change', () => render());
+            }
+            const okBtn = mask.querySelector('[data-ok]');
+            if (okBtn) okBtn.addEventListener('click', () => {
+                const result = collectValues();
+                for (const f of fields) {
+                    const v = result[f.key];
+                    const emptyArr = Array.isArray(v) && v.length === 0;
+                    if (f.required && (v === '' || v === null || v === undefined || emptyArr)) {
+                        showToast(`请填写「${f.label}」`, 'error');
+                        return;
+                    }
                 }
-                result[f.key] = v;
-            }
-            for (const f of fields) {
-                const v = result[f.key];
-                const emptyArr = Array.isArray(v) && v.length === 0;
-                if (f.required && (v === '' || v === null || v === undefined || emptyArr)) {
-                    showToast(`请填写「${f.label}」`, 'error');
-                    return;
+                close();
+                if (onSubmit) onSubmit(result);
+            });
+            mask.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                    mask.querySelector('[data-ok]').click();
                 }
-            }
-            close();
-            if (onSubmit) onSubmit(result);
-        });
+            });
+            const first = mask.querySelector('input,select,textarea');
+            if (first) setTimeout(() => first.focus(), 50);
+        }
 
-        mask.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
-                mask.querySelector('[data-ok]').click();
-            }
-        });
-
-        const first = mask.querySelector('input,select,textarea');
-        if (first) setTimeout(() => first.focus(), 50);
+        function close() { mask.remove(); }
+        render();
     },
 
     /**

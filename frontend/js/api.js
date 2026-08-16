@@ -16,7 +16,14 @@ window.API = {
             const resp = await fetch(this.BASE + url, config);
             const json = await resp.json();
             if (!resp.ok) {
-                throw new Error(json.detail || json.error || `HTTP ${resp.status}`);
+                // detail/error 可能是对象（如 {message, conflicts}），保留到 err.detail 供前端展示冲突
+                const rawDetail = (json.detail !== undefined) ? json.detail : json.error;
+                const msg = (rawDetail && typeof rawDetail === 'object')
+                    ? (rawDetail.message || '操作失败')
+                    : (rawDetail || `HTTP ${resp.status}`);
+                const err = new Error(String(msg));
+                if (rawDetail && typeof rawDetail === 'object') err.detail = rawDetail;
+                throw err;
             }
             return json;
         } catch (err) {

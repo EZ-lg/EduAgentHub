@@ -187,12 +187,12 @@ db.flush()
 def mk_sched(c, weekday, start, end, room):
     db.add(ClassSchedule(class_id=c.id, weekday=weekday, start_time=start, end_time=end,
                          classroom_id=room_ids[room], teacher_id=c.teacher_id, status="active"))
-mk_sched(c_math2, 5, "10:10", "12:10", "4号课堂")   # 周六 上午二
-mk_sched(c_math2, 6, "10:10", "12:10", "4号课堂")   # 周日 上午二
-mk_sched(c_gao3_1v1, 5, "14:00", "16:00", "VIP2")   # 周六 下午三
+mk_sched(c_math2, 5, "10:40", "12:10", "4号课堂")   # 周六 上午二（10:30后开始）
+mk_sched(c_math2, 6, "10:40", "12:10", "4号课堂")   # 周日 上午二
+mk_sched(c_gao3_1v1, 5, "14:00", "16:00", "VIP2")   # 周六 下午三（16:00前结束）
 mk_sched(c_gao3_1v1, 6, "14:00", "16:00", "VIP2")   # 周日 下午三
-mk_sched(c_phy1, 5, "08:00", "10:00", "5号课堂")    # 周六 上午一
-mk_sched(c_phy1, 6, "08:00", "10:00", "5号课堂")    # 周日 上午一
+mk_sched(c_phy1, 5, "09:00", "10:30", "5号课堂")    # 周六 上午一（9点开始，10:30前结束）
+mk_sched(c_phy1, 6, "09:00", "10:30", "5号课堂")    # 周日 上午一
 # c_eng2 高二英语冲刺班：无课次 → 工作台「待排课」演示
 
 # ---- 成绩 / 报告 / 课程规划 / 沟通日志 ----
@@ -360,12 +360,12 @@ for act in [
 ]:
     db.add(ActivityLog(action=act[0], detail=act[1], student_id=act[2], subject_id=act[3]))
 
-# ---- 节次模板（机构白天上课：上午一二节 + 下午三四节）----
+# ---- 节次模板（机构白天上课；早上9点开始；10:30/16:00 分界归节次）----
 periods = [
-    {"label": "上午一", "start": "08:00", "end": "10:00"},
-    {"label": "上午二", "start": "10:10", "end": "12:10"},
+    {"label": "上午一", "start": "09:00", "end": "10:30"},
+    {"label": "上午二", "start": "10:30", "end": "12:00"},
     {"label": "下午三", "start": "14:00", "end": "16:00"},
-    {"label": "下午四", "start": "16:10", "end": "18:10"},
+    {"label": "下午四", "start": "16:00", "end": "18:00"},
 ]
 row = db.query(Setting).filter(Setting.key == "class_periods").first()
 if not row:

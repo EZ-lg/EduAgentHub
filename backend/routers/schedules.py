@@ -64,12 +64,12 @@ def _enrich_conflicts(db, conflicts, weekday=None, start=None, end=None):
         out.append(c)
     return out
 
-# 默认节次模板（机构白天上课，晚上不上：上午一二节 + 下午三四节）
+# 默认节次模板（机构白天上课，晚上不上；早上 9 点开始；10:30 前结束=上午一、10:30 后开始=上午二、16:00 前结束=下午三、16:00 后开始=下午四）
 DEFAULT_PERIODS = [
-    {"label": "上午一", "start": "08:00", "end": "10:00"},
-    {"label": "上午二", "start": "10:10", "end": "12:10"},
+    {"label": "上午一", "start": "09:00", "end": "10:30"},
+    {"label": "上午二", "start": "10:30", "end": "12:00"},
     {"label": "下午三", "start": "14:00", "end": "16:00"},
-    {"label": "下午四", "start": "16:10", "end": "18:10"},
+    {"label": "下午四", "start": "16:00", "end": "18:00"},
 ]
 PERIODS_KEY = "class_periods"
 
@@ -413,7 +413,7 @@ def check_conflicts(data: dict, db: Session = Depends(get_db)):
     for r in existing:
         r["student_ids"] = _class_student_ids(db, r["class_id"])
     conflicts = scheduler.check_conflicts_batch(existing + built)
-    return success_response({"conflicts": conflicts})
+    return success_response({"conflicts": _enrich_conflicts(db, conflicts)})
 
 
 @router.post("")

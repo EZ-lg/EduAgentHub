@@ -97,18 +97,18 @@ async function loadDaySchedule() {
 /* ---------- 渲染 教室×节次 网格（一屏显示：左列节次编号，具体时间在课程卡内） ---------- */
 function toMin(t) { const [h, m] = String(t || '').split(':'); return (+h || 0) * 60 + (+m || 0); }
 
-// 根据课程开始时间归入对应节次行（如 10:40 → 上午二）
-function periodIndexFor(start) {
-    const s = toMin(start);
-    for (let i = 0; i < periods.length; i++) {
-        const p = periods[i];
-        if (s >= toMin(p.start) && s < toMin(p.end)) return i;
+// 按机构标准归节次（用户拍板）：
+//   上午：10:30 前结束 → 上午一；10:30 后开始 → 上午二
+//   下午：16:00 前结束 → 下午三；16:00 后开始 → 下午四
+//   12:00 起算下午。具体时间可自定义，只按此规则归到哪一节课。
+function lessonIndexOf(start, end) {
+    const s = toMin(start), e = toMin(end);
+    if (s >= 12 * 60) {            // 下午
+        return e <= 16 * 60 ? 2 : 3;
     }
-    for (let i = periods.length - 1; i >= 0; i--) {
-        if (s >= toMin(periods[i].start)) return i;
-    }
-    return 0;
+    return e <= (10 * 60 + 30) ? 0 : 1;
 }
+const periodIndexFor = lessonIndexOf;
 
 function renderGrid(items) {
     const grid = document.getElementById('sched-grid');
@@ -128,10 +128,9 @@ function renderGrid(items) {
         html += `<tr>`;
         html += `<td style="background:${odd ? '#eef2ff' : '#f5f7ff'};padding:6px;text-align:center;vertical-align:middle;border-bottom:1px solid #e2e8f0;">
             <div class="text-sm font-semibold" style="color:#4f46e5;">${esc(p.label || ('第' + (i + 1) + '节'))}</div>
-            <div class="text-[10px] text-gray-400 num mt-0.5">${esc(p.start)}-${esc(p.end)}</div>
         </td>`;
         cols.forEach(c => {
-            const cellItems = items.filter(it => periodIndexFor(it.start_time) === i && (it.classroom_id || null) === c.id);
+            const cellItems = items.filter(it => lessonIndexOf(it.start_time, it.end_time) === i && (it.classroom_id || null) === c.id);
             html += `<td style="border-bottom:1px solid #e2e8f0;border-left:1px solid #f1f5f9;padding:4px;vertical-align:top;">`;
             cellItems.forEach(it => {
                 const isTerm = it.term_type === 'summer_winter';
