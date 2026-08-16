@@ -202,4 +202,10 @@ window.API = {
         trend() { return API.get('/api/dashboard/trend'); },
         subjectDist() { return API.get('/api/dashboard/subject-dist'); },
     },
+
+    // === 全局总览 / 学生总览（2.0 P5 G4/G5）===
+    overview: {
+        global() { return API.get('/api/overview'); },
+        student(studentId) { return API.get(`/api/students/${studentId}/overview`); },
+    },
 };

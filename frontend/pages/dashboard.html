@@ -1,6 +1,6 @@
-<!-- 工作台看板 — P9：统计卡片 + 趋势图表 + 学科分布 + 学生看板 + 最近活动 -->
+<!-- 全局总览 — 2.0 P5 G4/G5：统计条 + 待办区 + 学生卡片流 + 可选趋势图表 -->
 <div class="fade-in">
-    <!-- 统计卡片 -->
+    <!-- 统计条 -->
     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6" style="min-width:0;">
         <div class="stat-card">
             <div class="stat-icon stat-icon--blue"><svg class="icon"><use href="#icon-users"/></svg></div>
@@ -10,31 +10,32 @@
             </div>
         </div>
         <div class="stat-card">
-            <div class="stat-icon stat-icon--violet"><svg class="icon"><use href="#icon-book-open"/></svg></div>
+            <div class="stat-icon stat-icon--violet"><svg class="icon"><use href="#icon-clipboard-list"/></svg></div>
             <div>
-                <div class="stat-value num" id="stat-active-subjects">0</div>
-                <div class="stat-label">活跃学科</div>
+                <div class="stat-value num" id="stat-active-classes">0</div>
+                <div class="stat-label">活跃班级</div>
             </div>
         </div>
         <div class="stat-card">
-            <div class="stat-icon stat-icon--pink"><svg class="icon"><use href="#icon-user-plus"/></svg></div>
+            <div class="stat-icon stat-icon--pink"><svg class="icon"><use href="#icon-calendar"/></svg></div>
             <div>
-                <div class="stat-value num" id="stat-new-students">0</div>
-                <div class="stat-label">本月新增</div>
+                <div class="stat-value num" id="stat-weekly-sessions">0</div>
+                <div class="stat-label">本周课次</div>
             </div>
+        </div>
+        <div class="stat-card" style="position:relative;">
+            <div class="stat-icon stat-icon--red"><svg class="icon"><use href="#icon-zap"/></svg></div>
+            <div>
+                <div class="stat-value num" id="stat-pending">0</div>
+                <div class="stat-label">待排课班级</div>
+            </div>
+            <span class="badge badge--danger" id="stat-pending-badge" style="display:none;position:absolute;top:12px;right:12px;">需处理</span>
         </div>
         <div class="stat-card">
             <div class="stat-icon stat-icon--amber"><svg class="icon"><use href="#icon-graduation-cap"/></svg></div>
             <div>
                 <div class="stat-value num" id="stat-teachers">0</div>
                 <div class="stat-label">教师数</div>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon stat-icon--red"><svg class="icon"><use href="#icon-file-text"/></svg></div>
-            <div>
-                <div class="stat-value num" id="stat-pending">0</div>
-                <div class="stat-label">草稿报告</div>
             </div>
         </div>
         <div class="stat-card">
@@ -49,36 +50,74 @@
     <!-- 快捷操作 -->
     <div class="flex gap-3 mb-6 flex-wrap">
         <a href="#/students" class="btn-primary" style="text-decoration:none;"><svg class="icon icon--md"><use href="#icon-plus"/></svg> 新建学生</a>
-        <a href="#/teachers" class="btn-outline" style="text-decoration:none;"><svg class="icon icon--md"><use href="#icon-graduation-cap"/></svg> 教师管理</a>
-        <a href="#/knowledge-base" class="btn-outline" style="text-decoration:none;"><svg class="icon icon--md"><use href="#icon-book-open"/></svg> 知识库</a>
+        <a href="#/classes" class="btn-outline" style="text-decoration:none;"><svg class="icon icon--md"><use href="#icon-clipboard-list"/></svg> 班级管理</a>
+        <a href="#/schedule" class="btn-outline" style="text-decoration:none;"><svg class="icon icon--md"><use href="#icon-calendar"/></svg> 课表</a>
     </div>
 
-    <!-- 图表行 -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <div class="panel">
-            <div class="panel-title"><svg class="icon"><use href="#icon-trending-up"/></svg> 近 6 个月新增学生</div>
-            <div id="trend-chart" style="height:220px;"></div>
-        </div>
-        <div class="panel">
-            <div class="panel-title"><svg class="icon"><use href="#icon-pie-chart"/></svg> 学科分布（活跃学科）</div>
-            <div id="dist-chart" style="height:220px;"></div>
-        </div>
-    </div>
-
-    <!-- 学生看板 + 最近活动 -->
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4" style="align-items:start;">
-        <div class="panel" style="grid-column:span 1;">
-            <div class="panel-title mb-3"><svg class="icon"><use href="#icon-users"/></svg> 学生看板</div>
-            <div id="board-columns" class="grid grid-cols-3 gap-3">
-                <div class="col-span-3 text-center py-6 text-gray-300 text-sm">加载中...</div>
+    <!-- 待办区 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6" style="align-items:start;">
+        <!-- 待排课 -->
+        <div class="panel" style="padding:18px 20px;">
+            <div class="panel-title mb-3 flex items-center justify-between">
+                <span class="inline-flex items-center gap-1.5"><svg class="icon icon--md text-amber-500"><use href="#icon-zap"/></svg> 待排课班级</span>
+                <span class="text-xs text-gray-300 num" id="todo-pending-count">0</span>
+            </div>
+            <div id="todo-pending" class="text-sm">
+                <div class="empty-state py-6"><div class="empty-icon" style="width:40px;height:40px;"><svg class="icon"><use href="#icon-check-circle"/></svg></div><div class="empty-title">全部班级已排课</div></div>
             </div>
         </div>
-        <div class="panel">
-            <div class="panel-title"><svg class="icon"><use href="#icon-pin"/></svg> 最近活动</div>
-            <div class="text-sm" id="activity-list">
-                <div class="empty-state py-8">
-                    <div class="empty-icon"><svg class="icon"><use href="#icon-inbox"/></svg></div>
-                    <div class="empty-title">暂无活动记录</div>
+        <!-- 今日有课 -->
+        <div class="panel" style="padding:18px 20px;">
+            <div class="panel-title mb-3 flex items-center justify-between">
+                <span class="inline-flex items-center gap-1.5"><svg class="icon icon--md text-indigo-500"><use href="#icon-calendar"/></svg> 今日有课</span>
+                <span class="text-xs text-gray-300 num" id="todo-today-count">0</span>
+            </div>
+            <div id="todo-today" class="text-sm">
+                <div class="empty-state py-6"><div class="empty-icon" style="width:40px;height:40px;"><svg class="icon"><use href="#icon-inbox"/></svg></div><div class="empty-title">今日无课</div></div>
+            </div>
+        </div>
+        <!-- 最近活动 -->
+        <div class="panel" style="padding:18px 20px;">
+            <div class="panel-title mb-3"><span class="inline-flex items-center gap-1.5"><svg class="icon icon--md text-green-600"><use href="#icon-pin"/></svg> 最近活动</span></div>
+            <div id="todo-activities" class="text-sm">
+                <div class="empty-state py-6"><div class="empty-icon" style="width:40px;height:40px;"><svg class="icon"><use href="#icon-inbox"/></svg></div><div class="empty-title">暂无活动记录</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 学生卡片流 -->
+    <div class="panel">
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div class="panel-title mb-0"><svg class="icon icon--md text-indigo-500"><use href="#icon-users"/></svg> 学生总览 <span class="text-xs font-normal text-gray-400 num" id="student-flow-count"></span></div>
+            <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1" id="student-flow-filter">
+                <button class="term-btn active" data-sf="active" onclick="setStudentFilter('active')" style="padding:4px 12px;font-size:12px;border-radius:6px;">在读</button>
+                <button class="term-btn" data-sf="completed" onclick="setStudentFilter('completed')" style="padding:4px 12px;font-size:12px;border-radius:6px;">已结课</button>
+                <button class="term-btn" data-sf="abandoned" onclick="setStudentFilter('abandoned')" style="padding:4px 12px;font-size:12px;border-radius:6px;">已放弃</button>
+                <button class="term-btn" data-sf="all" onclick="setStudentFilter('all')" style="padding:4px 12px;font-size:12px;border-radius:6px;">全部</button>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3" id="student-card-grid">
+            <div class="col-span-full text-center py-8 text-gray-300 text-sm">加载中...</div>
+        </div>
+    </div>
+
+    <!-- 趋势图表（可选区块） -->
+    <div class="panel">
+        <div class="flex items-center justify-between mb-3">
+            <div class="panel-title mb-0"><svg class="icon icon--md text-indigo-500"><use href="#icon-trending-up"/></svg> 数据趋势</div>
+            <button onclick="toggleCharts()" class="btn-outline" style="padding:4px 12px;font-size:12px;" id="btn-toggle-charts">
+                <svg class="icon icon--sm"><use href="#icon-chevron-down"/></svg> 收起
+            </button>
+        </div>
+        <div id="chart-area">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                    <div class="text-sm text-gray-600 mb-2 inline-flex items-center gap-1.5"><svg class="icon icon--sm"><use href="#icon-trending-up"/></svg> 近 6 个月新增学生</div>
+                    <div id="trend-chart" style="height:220px;"></div>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-600 mb-2 inline-flex items-center gap-1.5"><svg class="icon icon--sm"><use href="#icon-pie-chart"/></svg> 学科分布（活跃学科）</div>
+                    <div id="dist-chart" style="height:220px;"></div>
                 </div>
             </div>
         </div>
@@ -88,24 +127,140 @@
 <script>
 (function () {
 let trendChart = null, distChart = null;
+let studentFlowData = [];      // 后端返回的全部学生卡片
+let studentFilter = 'active';  // 当前筛选：active/completed/abandoned/all
 
-const STATUS_COLUMNS = [
-    { key: 'active', label: '在读', color: '#10b981' },
-    { key: 'completed', label: '已结课', color: '#64748b' },
-    { key: 'abandoned', label: '已放弃', color: '#ef4444' },
-];
+const AVATAR_COLORS = ['#4f46e5', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#14b8a6', '#ef4444'];
 const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#64748b'];
 
 function esc(s) { return Utils.escapeHtml(String(s ?? '')); }
 
-/* ---------- 统计卡片 ---------- */
+function avatarColor(name) {
+    let sum = 0;
+    for (const ch of String(name || '')) sum += ch.charCodeAt(0);
+    return AVATAR_COLORS[sum % AVATAR_COLORS.length];
+}
+
+const STATUS_TEXT = { active: '在读', completed: '已结课', abandoned: '已放弃' };
+
+/* ---------- 统计条 ---------- */
 function renderStats(d) {
     document.getElementById('stat-active-students').textContent = d.active_students || 0;
-    document.getElementById('stat-active-subjects').textContent = d.active_subjects || 0;
-    document.getElementById('stat-new-students').textContent = d.new_students_this_month || 0;
+    document.getElementById('stat-active-classes').textContent = d.active_classes || 0;
+    document.getElementById('stat-weekly-sessions').textContent = d.weekly_sessions || 0;
+    document.getElementById('stat-pending').textContent = d.pending_schedule || 0;
     document.getElementById('stat-teachers').textContent = d.teachers || 0;
-    document.getElementById('stat-pending').textContent = d.pending_reports || 0;
     document.getElementById('stat-total-students').textContent = d.total_students || 0;
+    const badge = document.getElementById('stat-pending-badge');
+    if (badge) badge.style.display = d.pending_schedule > 0 ? '' : 'none';
+}
+
+/* ---------- 待办区 ---------- */
+function renderTodos(todos) {
+    renderPending(todos.pending_schedule || []);
+    renderToday(todos.today_classes || []);
+    renderActivities(todos.activities || []);
+}
+
+function renderPending(list) {
+    document.getElementById('todo-pending-count').textContent = list.length;
+    const box = document.getElementById('todo-pending');
+    if (!box) return;
+    if (!list.length) {
+        box.innerHTML = `<div class="empty-state py-6"><div class="empty-icon" style="width:40px;height:40px;"><svg class="icon"><use href="#icon-check-circle"/></svg></div><div class="empty-title">全部班级已排课</div></div>`;
+        return;
+    }
+    box.innerHTML = list.map(c => `
+        <div class="flex items-center justify-between gap-2 py-2 border-b cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1 transition" style="border-color:#f8fafc;" onclick="location.hash='#/classes/${c.id}'">
+            <div class="min-w-0">
+                <div class="text-sm text-gray-700 font-medium truncate">${esc(c.name)}</div>
+                <div class="text-xs text-gray-400 truncate">${esc(c.subject_name || '未设学科')} · ${esc(c.teacher_name || '未指派教师')}</div>
+            </div>
+            <span class="badge badge--warning shrink-0">去排课</span>
+        </div>`).join('');
+}
+
+function renderToday(list) {
+    document.getElementById('todo-today-count').textContent = list.length;
+    const box = document.getElementById('todo-today');
+    if (!box) return;
+    if (!list.length) {
+        box.innerHTML = `<div class="empty-state py-6"><div class="empty-icon" style="width:40px;height:40px;"><svg class="icon"><use href="#icon-inbox"/></svg></div><div class="empty-title">今日无课</div></div>`;
+        return;
+    }
+    box.innerHTML = list.map(c => `
+        <div class="flex items-center justify-between gap-2 py-2 border-b cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1 transition" style="border-color:#f8fafc;" onclick="location.hash='#/schedule'">
+            <div class="min-w-0">
+                <div class="text-sm text-gray-700 font-medium truncate">${esc(c.name)}</div>
+                <div class="text-xs text-gray-400">${esc(c.start_time || '')}-${esc(c.end_time || '')} · ${esc(c.classroom_name || '未设教室')} · ${c.student_count} 人</div>
+            </div>
+            ${c.term_type === 'summer_winter' ? '<span class="badge badge--warning shrink-0">寒暑假班</span>' : ''}
+        </div>`).join('');
+}
+
+function renderActivities(list) {
+    const box = document.getElementById('todo-activities');
+    if (!box) return;
+    if (!list || !list.length) {
+        box.innerHTML = `<div class="empty-state py-6"><div class="empty-icon" style="width:40px;height:40px;"><svg class="icon"><use href="#icon-inbox"/></svg></div><div class="empty-title">暂无活动记录</div></div>`;
+        return;
+    }
+    box.innerHTML = list.map(a => {
+        const who = a.student_name
+            ? `<span class="font-medium text-gray-600">${esc(a.student_name)}</span>${a.subject_name ? `<span class="text-gray-300"> · ${esc(a.subject_name)}</span>` : ''}`
+            : '';
+        return `<div class="py-2 border-b" style="border-color:#f8fafc;">
+            <div class="text-sm text-gray-500 truncate">
+                ${who ? who + ' — ' : ''}${esc(a.action)}<span class="text-gray-300 text-xs ml-1">${esc(a.detail)}</span>
+            </div>
+            <div class="text-gray-300 text-xs mt-0.5 num">${Utils.formatDate(a.created_at, true)}</div>
+        </div>`;
+    }).join('');
+}
+
+/* ---------- 学生卡片流 ---------- */
+function setStudentFilter(f) {
+    studentFilter = f;
+    document.querySelectorAll('#student-flow-filter .term-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.sf === f);
+    });
+    renderStudentFlow();
+}
+
+function renderStudentFlow() {
+    const box = document.getElementById('student-card-grid');
+    if (!box) return;
+    const list = studentFilter === 'all'
+        ? studentFlowData
+        : studentFlowData.filter(s => s.status === studentFilter);
+    document.getElementById('student-flow-count').textContent = `（${list.length} 人）`;
+    if (!list.length) {
+        box.innerHTML = `<div class="col-span-full text-center py-8 text-gray-300 text-sm">${studentFilter === 'active' ? '暂无在读学生，先去「学生档案」新建吧' : '该状态暂无学生'}</div>`;
+        return;
+    }
+    box.innerHTML = list.map(s => {
+        const repBadge = s.report_status === 'published'
+            ? '<span class="badge badge--success">已出报告</span>'
+            : (s.report_status === 'draft' ? '<span class="badge badge--neutral">报告草稿</span>' : '<span class="badge badge--neutral" style="opacity:.55;">无报告</span>');
+        const subs = (s.subjects || []).slice(0, 3).map(x => `<span class="badge badge--info">${esc(x)}</span>`).join('');
+        const more = (s.subjects || []).length > 3 ? `<span class="text-[10px] text-gray-300">+${(s.subjects || []).length - 3}</span>` : '';
+        return `<div class="student-card" onclick="location.hash='#/student/${s.id}'">
+            <div class="flex items-center gap-3">
+                <div class="student-avatar" style="background:${avatarColor(s.name)};">${esc((s.name || '?').charAt(0))}</div>
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="text-sm font-semibold text-gray-800 truncate">${esc(s.name)}</span>
+                        ${s.grade ? `<span class="text-xs text-gray-400">${esc(s.grade)}</span>` : ''}
+                    </div>
+                    <div class="text-xs text-gray-400 mt-0.5">${s.subject_count} 学科 · ${s.class_count} 班级 · 本周 ${s.weekly_sessions} 课</div>
+                </div>
+                <div class="shrink-0">${repBadge}</div>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-1 items-center">
+                ${subs || '<span class="text-[11px] text-gray-300">未开学科</span>'}${more}
+            </div>
+        </div>`;
+    }).join('');
 }
 
 /* ---------- 图表 ---------- */
@@ -149,73 +304,28 @@ function renderCharts(trend, dist) {
     }
 }
 
-/* ---------- 学生看板 ---------- */
-function renderBoard(board) {
-    const box = document.getElementById('board-columns');
-    if (!box) return;
-    const isEmpty = STATUS_COLUMNS.every(c => !(board[c.key] || []).length);
-    if (isEmpty) {
-        box.innerHTML = '<div class="col-span-3 text-center py-8 text-gray-300 text-sm">暂无学生，先去「学生档案」新建吧</div>';
-        return;
+function toggleCharts() {
+    const area = document.getElementById('chart-area');
+    const btn = document.getElementById('btn-toggle-charts');
+    if (!area) return;
+    const hidden = area.classList.toggle('hidden');
+    btn.innerHTML = hidden
+        ? '<svg class="icon icon--sm"><use href="#icon-chevron-down"/></svg> 展开'
+        : '<svg class="icon icon--sm"><use href="#icon-chevron-down"/></svg> 收起';
+    if (!hidden) {
+        // 重新可见后刷新图表尺寸（隐藏时 init 会拿到 0 宽）
+        if (trendChart && trendChart.resize) trendChart.resize();
+        if (distChart && distChart.resize) distChart.resize();
     }
-    box.innerHTML = STATUS_COLUMNS.map(col => {
-        const items = board[col.key] || [];
-        return `<div class="bg-white rounded-lg p-3" style="border:1px solid #f1f5f9;">
-            <div class="text-xs font-semibold mb-2 flex items-center gap-1.5 text-gray-600">
-                <span class="w-2 h-2 rounded-full" style="background:${col.color};"></span>
-                ${col.label}
-                <span class="text-gray-300 font-normal num">${items.length}</span>
-            </div>
-            <div class="space-y-2" style="max-height:340px;overflow-y:auto;">
-                ${items.length ? items.map(cardHtml).join('') : '<div class="text-xs text-gray-300 text-center py-3">暂无</div>'}
-            </div>
-        </div>`;
-    }).join('');
-}
-
-function cardHtml(s) {
-    return `<div onclick="location.hash='#/student/${s.id}'" class="bg-white rounded-lg p-3 cursor-pointer transition hover:shadow-md" style="border:1px solid #f1f5f9;">
-        <div class="text-sm font-medium text-gray-800">${esc(s.name)} <span class="text-xs font-normal text-gray-400">${esc(s.grade || '')}</span></div>
-        <div class="mt-1.5 flex flex-wrap gap-1">
-            ${(s.subjects || []).map(x => `<span class="badge badge--info">${esc(x)}</span>`).join('') || '<span class="text-[10px] text-gray-300">未开学科</span>'}
-        </div>
-        <div class="mt-1.5 text-[10px] text-gray-300">${Utils.formatDate(s.updated_at, true)}</div>
-    </div>`;
-}
-
-/* ---------- 最近活动 ---------- */
-function renderActivities(list) {
-    const box = document.getElementById('activity-list');
-    if (!box) return;
-    if (!list || !list.length) {
-        box.innerHTML = `<div class="empty-state py-8">
-            <div class="empty-icon"><svg class="icon"><use href="#icon-inbox"/></svg></div>
-            <div class="empty-title">暂无活动记录</div></div>`;
-        return;
-    }
-    box.innerHTML = list.map(a => {
-        const who = a.student_name
-            ? `<span class="font-medium text-gray-600">${esc(a.student_name)}</span>${a.subject_name ? `<span class="text-gray-300"> · ${esc(a.subject_name)}</span>` : ''}`
-            : '';
-        return `<div class="py-2 border-b flex items-center justify-between gap-2" style="border-color:#f8fafc;">
-            <div class="text-sm text-gray-500 truncate">
-                ${who ? who + ' — ' : ''}${esc(a.action)}<span class="text-gray-300 text-xs ml-1">${esc(a.detail)}</span>
-            </div>
-            <div class="text-gray-300 text-xs shrink-0 num">${Utils.formatDate(a.created_at, true)}</div>
-        </div>`;
-    }).join('');
 }
 
 /* ---------- 主流程 ---------- */
 async function loadDashboard() {
-    let stats = {}, board = {}, trend = [], dist = [], acts = [];
+    let ov = { stats: {}, students: [], todos: {} };
+    let trend = [], dist = [];
     try {
-        const r = await API.dashboard.stats();
-        if (r.success) stats = r.data;
-    } catch (e) { console.error(e); }
-    try {
-        const r = await API.dashboard.board();
-        if (r.success) board = r.data;
+        const r = await API.overview.global();
+        if (r.success) ov = r.data;
     } catch (e) { console.error(e); }
     try {
         const r = await API.dashboard.trend();
@@ -225,18 +335,15 @@ async function loadDashboard() {
         const r = await API.dashboard.subjectDist();
         if (r.success) dist = r.data;
     } catch (e) { console.error(e); }
-    try {
-        const r = await API.dashboard.activities();
-        if (r.success) acts = r.data;
-    } catch (e) { console.error(e); }
 
-    renderStats(stats);
-    renderBoard(board);
-    renderActivities(acts);
+    renderStats(ov.stats || {});
+    renderTodos(ov.todos || {});
+    studentFlowData = ov.students || [];
+    renderStudentFlow();
     renderCharts(trend, dist);
 }
 
-/* ---------- 图表生命周期安全（页面切换释放，避免泄漏） ---------- */
+/* ---------- 图表生命周期安全 ---------- */
 function onResize() {
     if (trendChart && trendChart.resize) trendChart.resize();
     if (distChart && distChart.resize) distChart.resize();
@@ -251,6 +358,10 @@ window.__pageUnmounted = function () {
 
 // 注册全局刷新（顶部「↻ 刷新」/切回标签页自动调用）
 window.currentPageRefresh = loadDashboard;
+
+Object.assign(window, {
+    setStudentFilter, toggleCharts, loadDashboard,
+});
 
 loadDashboard();
 })();

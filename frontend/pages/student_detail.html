@@ -1,6 +1,8 @@
-<!-- 学生详情页 — 白色简洁风 -->
+<!-- 学生总览页 — 2.0 P5 G5：顶部总览 + 学科卡片区 + 班级区 + 学科功能 Tab -->
 <div class="fade-in">
-    <a href="#/students" class="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-indigo-500 mb-4 transition"><svg class="icon icon--sm"><use href="#icon-arrow-left"/></svg> 返回列表</a>
+    <div class="flex items-center gap-3 mb-4">
+        <a href="#/students" class="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-indigo-500 transition"><svg class="icon icon--sm"><use href="#icon-arrow-left"/></svg> 返回列表</a>
+    </div>
 
     <div class="panel mb-4" id="student-info-card">
         <div class="text-center py-10 text-gray-300">加载中...</div>
@@ -14,12 +16,19 @@
                 <button onclick="showAddSubjectModal()" class="btn-primary" style="padding:6px 16px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-plus"/></svg> 新增学科</button>
             </div>
         </div>
-        <div class="grid grid-cols-5 gap-3" id="subject-cards">
-            <div class="text-gray-300 text-sm py-4">加载中...</div>
+        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3" id="subject-cards">
+            <div class="col-span-full text-gray-300 text-sm py-4">加载中...</div>
         </div>
     </div>
 
+    <!-- 班级区（2.0 P5 G5.1/G2.7：学生报班关系 + 课次） -->
+    <div class="panel mb-4">
+        <div class="panel-title mb-2"><svg class="icon icon--md text-indigo-500"><use href="#icon-clipboard-list"/></svg> 班级</div>
+        <div id="student-classes"><div class="text-gray-300 text-sm py-3">加载中...</div></div>
+    </div>
+
     <div id="subject-detail-area" class="hidden">
+        <a href="#" onclick="backToOverview()" id="back-to-overview" class="hidden inline-flex items-center gap-1 text-sm text-gray-400 hover:text-indigo-500 mb-3 transition"><svg class="icon icon--sm"><use href="#icon-arrow-left"/></svg> 返回学科总览</a>
         <div class="flex gap-0 border-b" style="border-color:#e2e8f0;" id="subject-tabs">
             <button class="px-4 py-2.5 text-sm font-medium text-indigo-600 bg-white border border-b-0 rounded-t-lg inline-flex items-center gap-1.5" style="border-color:#e2e8f0; margin-bottom:-1px;" data-tab="report" onclick="switchSubjectTab('report')"><svg class="icon icon--md"><use href="#icon-file-text"/></svg> 报告</button>
             <button class="px-4 py-2.5 text-sm text-gray-400 hover:text-gray-600 inline-flex items-center gap-1.5" data-tab="plan" onclick="switchSubjectTab('plan')"><svg class="icon icon--md"><use href="#icon-calendar"/></svg> 课程规划</button>
@@ -55,54 +64,124 @@ function studentFields() {
     ];
 }
 
-/* ---------- 学生信息卡 ---------- */
-async function loadStudentDetail() {
+/* ---------- 学生总览（2.0 P5 G5：顶部信息 + 统计 + 学科卡片 + 班级区） ---------- */
+let overviewData = null;   // /api/students/{id}/overview 聚合缓存
+
+const AVATAR_COLORS = ['#4f46e5', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#14b8a6', '#ef4444'];
+function avatarColor(name) {
+    let sum = 0;
+    for (const ch of String(name || '')) sum += ch.charCodeAt(0);
+    return AVATAR_COLORS[sum % AVATAR_COLORS.length];
+}
+
+async function loadStudentOverview() {
+    let ov = null;
     try {
-        const r = await API.students.get(studentId);
-        if (!r.success) throw new Error(r.error);
-        const s = r.data;
-        const st = Utils.statusLabel(s.status);
-        document.getElementById('student-info-card').innerHTML = `
-            <div class="flex items-start justify-between">
-                <div>
-                    <div class="flex items-center gap-3 mb-3">
-                        <h1 class="text-xl font-bold text-gray-800">${Utils.escapeHtml(s.name)}</h1>
-                        <span class="${st.cls}">${st.text}</span>
-                    </div>
-                    <div class="grid grid-cols-2 gap-x-8 gap-y-1 text-sm text-gray-500">
-                        <div>性别：${Utils.escapeHtml(s.gender) || '-'}</div>
-                        <div>年级：${Utils.escapeHtml(s.grade) || '-'}</div>
-                        <div>学校：${Utils.escapeHtml(s.school) || '-'}</div>
-                        <div>电话：${Utils.escapeHtml(s.phone) || '-'}</div>
-                        <div>家长：${Utils.escapeHtml(s.parent_name) || '-'} ${Utils.escapeHtml(s.parent_phone) || ''}</div>
-                        <div>地址：${Utils.escapeHtml(s.address) || '-'}</div>
-                        <div>来源：${Utils.escapeHtml(s.source) || '-'}</div>
-                        <div>建档：${Utils.formatDate(s.created_at)}</div>
-                    </div>
-                    ${s.notes ? `<div class="mt-3 pt-3 border-t border-gray-100 text-sm text-gray-400">备注：${Utils.escapeHtml(s.notes)}</div>` : ''}
+        const r = await API.overview.student(studentId);
+        if (r.success) ov = r.data;
+    } catch (e) { console.error('学生总览加载失败:', e); }
+    if (!ov) {
+        document.getElementById('student-info-card').innerHTML =
+            `<div class="text-center py-10 text-red-400">总览加载失败，请刷新重试</div>`;
+        return;
+    }
+    overviewData = ov;
+    subjectList = ov.subjects || [];   // 供新增学科查重
+    renderStudentInfoCard(ov);
+    renderSubjectCards(ov);
+    renderClassSection(ov);
+}
+
+// 学生信息卡（含头像缩写 + 统计条），供状态切换/编辑后局部刷新复用
+function renderStudentInfoCard(ov) {
+    const s = ov.student;
+    const st = Utils.statusLabel(s.status);
+    const stats = ov.stats || {};
+    const box = document.getElementById('student-info-card');
+    box.innerHTML = `
+        <div class="flex items-start gap-4 flex-wrap">
+            <div class="student-avatar-lg" style="background:${avatarColor(s.name)};">${esc((s.name || '?').charAt(0))}</div>
+            <div class="flex-1" style="min-width:240px;">
+                <div class="flex items-center gap-3 mb-3 flex-wrap">
+                    <h1 class="text-xl font-bold text-gray-800">${esc(s.name)}</h1>
+                    <span class="${st.cls}">${st.text}</span>
+                    ${s.grade ? `<span class="text-sm text-gray-400">${esc(s.grade)}</span>` : ''}
                 </div>
-                <div class="flex flex-col items-end gap-2">
-                    <button onclick="openStudentChat()" class="btn-primary" style="padding:6px 16px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-bot"/></svg> AI 助手</button>
-                    <select onchange="changeStudentStatus(this.value)" class="text-xs py-1 px-2 rounded-lg border">
-                        <option value="active" ${s.status==='active'?'selected':''}>在读</option>
-                        <option value="completed" ${s.status==='completed'?'selected':''}>已结课</option>
-                        <option value="abandoned" ${s.status==='abandoned'?'selected':''}>已放弃</option>
-                    </select>
-                    <div class="flex gap-2">
-                        <button onclick="editStudentInfo()" class="text-xs text-gray-400 hover:text-indigo-500 inline-flex items-center gap-1"><svg class="icon icon--sm"><use href="#icon-pencil"/></svg> 编辑</button>
-                        <button onclick="deleteStudent()" class="text-xs text-gray-300 hover:text-red-500 inline-flex items-center gap-1"><svg class="icon icon--sm"><use href="#icon-trash-2"/></svg> 删除</button>
-                    </div>
+                <div class="grid grid-cols-2 gap-x-8 gap-y-1 text-sm text-gray-500">
+                    <div>性别：${esc(s.gender) || '-'}</div>
+                    <div>学校：${esc(s.school) || '-'}</div>
+                    <div>电话：${esc(s.phone) || '-'}</div>
+                    <div>家长：${esc(s.parent_name) || '-'} ${esc(s.parent_phone) || ''}</div>
+                    <div>地址：${esc(s.address) || '-'}</div>
+                    <div>来源：${esc(s.source) || '-'}</div>
+                    <div>建档：${Utils.formatDate(s.created_at)}</div>
+                </div>
+                ${s.notes ? `<div class="mt-3 pt-3 border-t border-gray-100 text-sm text-gray-400">备注：${esc(s.notes)}</div>` : ''}
+            </div>
+            <div class="flex flex-col items-end gap-2">
+                <button onclick="openStudentChat()" class="btn-primary" style="padding:6px 16px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-bot"/></svg> AI 助手</button>
+                <select onchange="changeStudentStatus(this.value)" class="text-xs py-1 px-2 rounded-lg border">
+                    <option value="active" ${s.status==='active'?'selected':''}>在读</option>
+                    <option value="completed" ${s.status==='completed'?'selected':''}>已结课</option>
+                    <option value="abandoned" ${s.status==='abandoned'?'selected':''}>已放弃</option>
+                </select>
+                <div class="flex gap-2">
+                    <button onclick="editStudentInfo()" class="text-xs text-gray-400 hover:text-indigo-500 inline-flex items-center gap-1"><svg class="icon icon--sm"><use href="#icon-pencil"/></svg> 编辑</button>
+                    <button onclick="deleteStudent()" class="text-xs text-gray-300 hover:text-red-500 inline-flex items-center gap-1"><svg class="icon icon--sm"><use href="#icon-trash-2"/></svg> 删除</button>
                 </div>
             </div>
-        `;
-    } catch(e) {
-        document.getElementById('student-info-card').innerHTML = `<div class="text-center py-10 text-red-400">加载失败: ${Utils.escapeHtml(e.message)}</div>`;
+        </div>
+        <div class="flex flex-wrap gap-3 mt-4 pt-4 border-t" style="border-color:#f1f5f9;">
+            <div class="stat-chip"><b class="num">${stats.subject_count || 0}</b><span>学科</span></div>
+            <div class="stat-chip"><b class="num">${stats.active_subject_count || 0}</b><span>活跃学科</span></div>
+            <div class="stat-chip"><b class="num">${stats.class_count || 0}</b><span>报班</span></div>
+            <div class="stat-chip"><b class="num">${stats.weekly_sessions || 0}</b><span>本周课次</span></div>
+        </div>
+    `;
+}
+
+/* ---------- 班级区（该生所有班级 + 排课摘要） ---------- */
+function renderClassSection(ov) {
+    const classes = ov.classes || [];
+    const box = document.getElementById('student-classes');
+    if (!box) return;
+    if (!classes.length) {
+        box.innerHTML = '<div class="text-gray-300 text-sm py-3">该生暂未报班。可在学科卡片点「一对一」快速建班，或到「班级管理」添加。</div>';
+        return;
     }
+    box.innerHTML = classes.map(c => {
+        const typeBadge = c.term_type === 'summer_winter'
+            ? '<span class="badge badge--warning">寒暑假班</span>'
+            : '<span class="badge badge--info">学期跟班</span>';
+        const stBadge = c.status === 'active'
+            ? '<span class="badge badge--success">在读</span>'
+            : '<span class="badge badge--neutral">已停用</span>';
+        const schedHtml = c.term_type === 'summer_winter'
+            ? `<div class="text-xs text-gray-400 mt-1">每天 ${esc(c.daily_start)}-${esc(c.daily_end)} · 共 ${c.total_lessons} 天 · ${esc(c.start_date || '?')}~${esc(c.end_date || '?')}</div>`
+            : (c.schedules && c.schedules.length
+                ? `<div class="flex flex-wrap gap-1 mt-1.5">${c.schedules.map(s => `<span class="badge badge--info">${s.weekday_label} ${s.start_time}-${s.end_time}</span>`).join('')}</div>`
+                : '<div class="text-xs text-gray-400 mt-1">尚未排课 · <a class="text-indigo-500" href="#/classes/' + c.id + '" onclick="event.stopPropagation()">去排课</a></div>');
+        return `<div class="flex items-center justify-between gap-3 py-2.5 border-b cursor-pointer hover:bg-gray-50 rounded px-1.5 -mx-1.5 transition" style="border-color:#f1f5f9;" onclick="location.hash='#/classes/${c.id}'">
+            <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-sm font-medium text-gray-800">${esc(c.name)}</span>
+                    ${typeBadge}${stBadge}
+                </div>
+                <div class="text-xs text-gray-400 mt-0.5">${esc(c.subject_name || '未设学科')} · ${esc(c.teacher_name || '未指派教师')} · ${esc(c.classroom_name || '未设教室')} · ${c.student_count} 人</div>
+                ${schedHtml}
+            </div>
+            <span class="text-gray-300 shrink-0"><svg class="icon"><use href="#icon-chevron-right"/></svg></span>
+        </div>`;
+    }).join('');
+}
+
+function backToOverview() {
+    location.hash = '#/student/' + studentId;
 }
 
 function changeStudentStatus(status) {
     API.students.updateStatus(studentId, status).then(r => {
-        if (r.success) { showToast('状态已更新', 'success'); loadStudentDetail(); }
+        if (r.success) { showToast('状态已更新', 'success'); loadStudentOverview(); }
         else showToast('更新失败：' + (r.error || '未知错误'), 'error');
     }).catch(e => showToast('更新失败：' + e.message, 'error'));
 }
@@ -120,7 +199,7 @@ function editStudentInfo() {
             onSubmit: async (data) => {
                 try {
                     const resp = await API.students.update(studentId, data);
-                    if (resp.success) { showToast('已保存', 'success'); loadStudentDetail(); }
+                    if (resp.success) { showToast('已保存', 'success'); loadStudentOverview(); }
                     else showToast('保存失败：' + (resp.error || '未知错误'), 'error');
                 } catch (e) { showToast('保存失败：' + e.message, 'error'); }
             },
@@ -143,42 +222,75 @@ function deleteStudent() {
     });
 }
 
-/* ---------- 学科卡片 ---------- */
+/* ---------- 学科卡片（升级版：成绩迷你线 + 报告状态 + 规划进度 + 班型教师） ---------- */
 let subjectList = [];   // 缓存当前学科列表，用于新增时查重
 
+// 内联 SVG 火花线：scores=[[date, percent]...] 升序，≥2 点才画
+function sparkline(scores, width = 110, height = 30) {
+    if (!scores || scores.length < 2) return '';
+    const pts = scores.map(s => s[1]);
+    const min = Math.min(...pts), max = Math.max(...pts);
+    const range = (max - min) || 1;
+    const x = i => (i * (width - 4)) / (pts.length - 1) + 2;
+    const y = v => height - 4 - ((v - min) / range) * (height - 10);
+    const line = pts.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    const area = `${line} L${x(pts.length - 1).toFixed(1)},${height - 2} L${x(0).toFixed(1)},${height - 2} Z`;
+    const up = pts[pts.length - 1] >= pts[0];
+    const color = up ? '#10b981' : '#ef4444';
+    return `<svg width="${width}" height="${height}" class="sparkline" style="display:block;">
+        <path d="${area}" fill="${color}" opacity="0.12"/>
+        <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+}
+
 async function loadSubjects() {
-    try {
-        const r = await API.subjects.list(studentId);
-        if (!r.success) throw new Error(r.error);
-        const subs = r.data;
-        subjectList = subs;
-        const container = document.getElementById('subject-cards');
-        if (!subs.length) {
-            container.innerHTML = '<div class="col-span-5 text-gray-300 text-sm py-4">暂无学科，点击右上角新增</div>';
-            return;
-        }
-        container.innerHTML = subs.map(sub => {
-            const isActive = sub.status === 'active';
-            const icon = Utils.subjectIcon(sub.name);
-            const active = currentSubjectId === sub.id ? 'active-subject' : '';
-            return `<div class="subject-card ${active}" onclick="selectSubject(${sub.id})">
-                <div class="flex items-center gap-2 mb-1">
-                    <span class="subject-icon"><svg class="icon"><use href="#${icon}"/></svg></span>
-                    <span class="font-medium text-gray-700">${Utils.escapeHtml(sub.name)}</span>
-                </div>
-                <div class="flex items-center justify-between text-xs">
-                    <span class="${isActive ? 'text-green-600' : 'text-gray-400'} inline-flex items-center gap-1"><span class="status-dot ${isActive ? 'status-dot--on' : 'status-dot--off'}"></span>${isActive ? '活跃' : '已停用'}</span>
-                    <div class="flex items-center gap-2">
-                        <button onclick="event.stopPropagation();location.hash='#/conversation/${sub.id}'" class="text-gray-300 hover:text-indigo-500 text-xs inline-flex items-center gap-0.5" title="进入 AI 对话采集"><svg class="icon icon--sm"><use href="#icon-message-square"/></svg> 对话</button>
-                        ${isActive ? `<button onclick="event.stopPropagation();createClassFromSubject(${sub.id})" class="text-gray-300 hover:text-green-600 text-xs inline-flex items-center gap-0.5" title="转为一对一上课班级"><svg class="icon icon--sm"><use href="#icon-user-plus"/></svg> 一对一</button>` : ''}
-                        <button onclick="event.stopPropagation();toggleSubject(${sub.id},'${sub.status}')" class="text-gray-300 hover:text-gray-500 text-xs">${isActive ? '停用' : '启用'}</button>
-                    </div>
-                </div>
-            </div>`;
-        }).join('');
-    } catch(e) {
-        document.getElementById('subject-cards').innerHTML = `<div class="text-red-400 text-sm">${Utils.escapeHtml(e.message)}</div>`;
+    await loadStudentOverview();
+}
+
+function renderSubjectCards(ov) {
+    const subs = ov.subjects || [];
+    const container = document.getElementById('subject-cards');
+    if (!container) return;
+    if (!subs.length) {
+        container.innerHTML = '<div class="col-span-full text-gray-300 text-sm py-4">暂无学科，点击右上角新增</div>';
+        return;
     }
+    container.innerHTML = subs.map(sub => {
+        const isActive = sub.status === 'active';
+        const icon = Utils.subjectIcon(sub.name);
+        const active = currentSubjectId === sub.id ? 'active-subject' : '';
+        const repBadge = sub.report
+            ? (sub.report.status === 'published'
+                ? '<span class="badge badge--success">已出报告</span>'
+                : '<span class="badge badge--neutral">报告草稿</span>')
+            : '<span class="badge badge--neutral" style="opacity:.55;">无报告</span>';
+        const planText = sub.plan
+            ? `<span class="text-[11px] text-gray-400">v${sub.plan.version} · ${sub.plan.lesson_count}课${sub.plan.total_hours ? ' · ' + sub.plan.total_hours + 'h' : ''}</span>`
+            : '';
+        const classText = sub.class_name
+            ? `<span class="inline-flex items-center gap-1"><svg class="icon icon--sm"><use href="#${sub.class_type === '1v1' ? 'icon-user' : 'icon-users'}"/></svg> ${sub.class_type === '1v1' ? '一对一' : '小班'}${sub.teacher_name ? ' · ' + esc(sub.teacher_name) : ''}</span>`
+            : '<span class="text-gray-300">未报班</span>';
+        const spark = sparkline(sub.scores);
+        return `<div class="subject-card ${active}" onclick="selectSubject(${sub.id})">
+            <div class="flex items-center gap-2 mb-1">
+                <span class="subject-icon"><svg class="icon"><use href="#${icon}"/></svg></span>
+                <span class="font-medium text-gray-700 truncate">${esc(sub.name)}</span>
+            </div>
+            <div class="text-[11px] text-gray-400">${classText}</div>
+            <div class="flex items-center justify-between mt-1.5 gap-1 flex-wrap">
+                ${repBadge}${planText}
+            </div>
+            ${spark ? `<div class="mt-1.5">${spark}</div>` : ''}
+            <div class="flex items-center justify-between text-xs mt-2 pt-2 border-t" style="border-color:#f8fafc;">
+                <span class="${isActive ? 'text-green-600' : 'text-gray-400'} inline-flex items-center gap-1"><span class="status-dot ${isActive ? 'status-dot--on' : 'status-dot--off'}"></span>${isActive ? '活跃' : '已停用'}</span>
+                <div class="flex items-center gap-2">
+                    <button onclick="event.stopPropagation();location.hash='#/conversation/${sub.id}'" class="text-gray-300 hover:text-indigo-500 text-xs inline-flex items-center gap-0.5" title="进入 AI 对话采集"><svg class="icon icon--sm"><use href="#icon-message-square"/></svg> 对话</button>
+                    ${isActive ? `<button onclick="event.stopPropagation();createClassFromSubject(${sub.id})" class="text-gray-300 hover:text-green-600 text-xs inline-flex items-center gap-0.5" title="转为一对一上课班级"><svg class="icon icon--sm"><use href="#icon-user-plus"/></svg> 一对一</button>` : ''}
+                    <button onclick="event.stopPropagation();toggleSubject(${sub.id},'${sub.status}')" class="text-gray-300 hover:text-gray-500 text-xs">${isActive ? '停用' : '启用'}</button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
 }
 
 function selectSubject(id) {
@@ -1213,8 +1325,7 @@ function deleteLog(id) {
 
 /* ---------- 初始化 ---------- */
 function refreshStudentDetail() {
-    loadStudentDetail();
-    loadSubjects();
+    loadStudentOverview();
     if (currentSubjectId) {
         document.getElementById('subject-detail-area').classList.remove('hidden');
         renderSubjectTab(currentSubjectTab);  // 刷新保留当前 Tab（修 bug：不再自动跳回报告）
@@ -1223,12 +1334,12 @@ function refreshStudentDetail() {
 // 注册全局刷新（顶部「↻ 刷新」按钮 / 切回标签页自动调用）
 window.currentPageRefresh = refreshStudentDetail;
 
-loadStudentDetail();
+loadStudentOverview();
 if (routeSubjectId) {
     document.getElementById('subject-detail-area').classList.remove('hidden');
+    document.getElementById('back-to-overview').classList.remove('hidden');
     renderSubjectTab('report');  // 首次进入默认报告 Tab
 }
-loadSubjects();
 
 /* ---------- 页面卸载钩子（app.js unmounted 调用）：释放 ECharts 实例 + resize 监听 ---------- */
 window.addEventListener('resize', onScoreChartResize);
@@ -1243,6 +1354,8 @@ Object.assign(window, {
     changeStudentStatus, deleteStudent, editStudentInfo, toggleSubject,
     generateSubjectReport, refreshStudentDetail, selectSubject,
     showAddSubjectModal, switchSubjectTab, createClassFromSubject,
+    // P5 总览
+    loadStudentOverview, backToOverview,
     // 报告删除 + 档案 AI 助手
     deleteReport, openStudentChat, sendStudentChat,
     // P6 成绩 Tab
