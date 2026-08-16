@@ -9,7 +9,7 @@
         </div>
         <div class="flex gap-2 items-center">
             <select id="kb-category" onchange="changeCategory(this.value)"
-                    class="text-sm border rounded-lg px-2.5 py-1.5" style="border-color:#e2e8f0;">
+                    class="text-sm border rounded-lg px-2.5 py-1.5" style="border-color:var(--border);">
                 <option value="">全部分类</option>
                 <option value="课程体系">课程体系</option>
                 <option value="师资">师资</option>
@@ -96,7 +96,7 @@ async function loadDocs() {
     table.classList.remove('hidden');
     tbody.innerHTML = docList.map(d => {
         const ext = EXT_LABEL[d.file_type] || (d.file_type || '').toUpperCase();
-        return `<tr class="border-b" style="border-color:#f1f5f9;">
+        return `<tr class="border-b" style="border-color:var(--border-soft);">
             <td class="py-2.5">
                 <div class="font-medium text-gray-800 truncate" style="max-width:200px;" title="${esc(d.title)}">${esc(d.title)}</div>
             </td>
@@ -158,8 +158,8 @@ function openUploadModal() {
         </div>
         <div class="ta-modal-body">
             <div id="${dropId}" class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition"
-                 style="border-color:#cbd5e1;background:#f8fafc;">
-                <div style="width:44px;height:44px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:#eef2ff;color:#4f46e5;"><svg class="icon icon--lg"><use href="#icon-upload-cloud"/></svg></div>
+                 style="border-color:var(--border);background:var(--surface-hover);">
+                <div style="width:44px;height:44px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:#EDEBFE;color:#6C5CE7;"><svg class="icon icon--lg"><use href="#icon-upload-cloud"/></svg></div>
                 <div class="text-sm text-gray-500" id="kb-drop-text">点击选择文件，或拖拽到此处</div>
                 <div class="text-xs text-gray-300 mt-1.5">支持 PDF / Word / TXT / Markdown，≤50MB</div>
             </div>
@@ -206,11 +206,11 @@ function openUploadModal() {
     fileInput.style.display = 'none';
     panel.appendChild(fileInput);
     dz.addEventListener('click', () => fileInput.click());
-    dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.style.borderColor = '#4f46e5'; dz.style.background = '#eef2ff'; });
-    dz.addEventListener('dragleave', () => { dz.style.borderColor = '#cbd5e1'; dz.style.background = '#f8fafc'; });
+    dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.style.borderColor = '#6C5CE7'; dz.style.background = '#EDEBFE'; });
+    dz.addEventListener('dragleave', () => { dz.style.borderColor = 'var(--border)'; dz.style.background = 'var(--surface-hover)'; });
     dz.addEventListener('drop', (e) => {
         e.preventDefault();
-        dz.style.borderColor = '#cbd5e1'; dz.style.background = '#f8fafc';
+        dz.style.borderColor = 'var(--border)'; dz.style.background = 'var(--surface-hover)';
         if (e.dataTransfer.files && e.dataTransfer.files[0]) setUploadFile(e.dataTransfer.files[0], dropId);
     });
     fileInput.addEventListener('change', () => { if (fileInput.files && fileInput.files[0]) setUploadFile(fileInput.files[0], dropId); });
@@ -380,7 +380,7 @@ async function doSearch() {
         const results = (r.success && r.data) ? r.data : [];
         if (!results.length) { box.innerHTML = '<span class="text-gray-400">未检索到相关内容（可尝试包含已停用文档）</span>'; return; }
         box.innerHTML = results.map((it, i) => `
-            <div class="mb-2.5 p-2.5 rounded-lg border" style="border-color:#e2e8f0;background:#f8fafc;">
+            <div class="mb-2.5 p-2.5 rounded-lg border" style="border-color:var(--border);background:var(--surface-hover);">
                 <div class="flex items-center gap-2 mb-1">
                     <span class="badge badge--info">#${i + 1}</span>
                     <span class="font-medium text-gray-700">${esc(it.title)}</span>

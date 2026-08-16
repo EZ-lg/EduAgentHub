@@ -1,7 +1,7 @@
 <!-- 系统设置页 — 白色简洁风 -->
 <div class="fade-in">
     <!-- Tab 导航 -->
-    <div class="flex gap-1 mb-5 border-b" style="border-color:#f1f5f9;">
+    <div class="flex gap-1 mb-5 border-b" style="border-color:var(--border-soft);">
         <button class="settings-tab active" data-tab="ai" onclick="switchSettingsTab('ai')"><svg class="icon"><use href="#icon-bot"/></svg> AI 配置</button>
         <button class="settings-tab" data-tab="org" onclick="switchSettingsTab('org')"><svg class="icon"><use href="#icon-building"/></svg> 机构信息</button>
         <button class="settings-tab" data-tab="data" onclick="switchSettingsTab('data')"><svg class="icon"><use href="#icon-database"/></svg> 数据管理</button>
@@ -116,7 +116,7 @@
                         <label class="settings-label">联系电话</label>
                         <input type="text" id="org-phone" class="w-full" placeholder="如：010-88888888">
                     </div>
-                    <div class="pt-2 border-t" style="border-color:#f1f5f9;">
+                    <div class="pt-2 border-t" style="border-color:var(--border-soft);">
                         <div class="settings-label inline-flex items-center gap-1"><svg class="icon icon--sm"><use href="#icon-calendar"/></svg> 课程默认（用于报告/规划生成）</div>
                     </div>
                     <div class="grid grid-cols-3 gap-3">
@@ -144,7 +144,7 @@
                     <div>
                         <label class="settings-label">Logo</label>
                         <div class="flex items-center gap-3">
-                            <img id="org-logo-preview" class="hidden w-12 h-12 rounded object-contain" style="border:1px solid #f1f5f9;" alt="logo">
+                            <img id="org-logo-preview" class="hidden w-12 h-12 rounded object-contain" style="border:1px solid var(--border-soft);" alt="logo">
                             <label class="btn-outline cursor-pointer" style="padding:6px 14px;font-size:13px;">
                                 <svg class="icon icon--md"><use href="#icon-paperclip"/></svg> 选择图片
                                 <input type="file" id="org-logo-input" accept="image/*" class="hidden" onchange="handleOrgLogo(this)">
@@ -160,8 +160,8 @@
             </div>
             <div class="panel">
                 <div class="panel-title"><svg class="icon"><use href="#icon-eye"/></svg> 预览</div>
-                <div class="rounded-lg text-center px-6 py-5" style="border:3px solid #4f46e5;background:#fff;">
-                    <div class="text-xl font-bold" style="color:#4f46e5;" id="org-preview-name">机构名称</div>
+                <div class="rounded-lg text-center px-6 py-5" style="border:3px solid #6C5CE7;background:#fff;">
+                    <div class="text-xl font-bold" style="color:#6C5CE7;" id="org-preview-name">机构名称</div>
                     <div class="text-xs text-gray-400 mt-1" id="org-preview-meta"></div>
                 </div>
                 <div class="text-xs text-gray-300 mt-3 leading-relaxed">
@@ -518,7 +518,7 @@ async function loadBackups() {
             box.innerHTML = '<div class="text-gray-300 text-sm">暂无备份（每次启动自动生成）</div>';
             return;
         }
-        box.innerHTML = `<div class="divide-y" style="border-color:#f1f5f9;">` + list.map(b => `
+        box.innerHTML = `<div class="divide-y" style="border-color:var(--border-soft);">` + list.map(b => `
             <div class="flex items-center justify-between py-2">
                 <span class="text-sm text-gray-700 num">${Utils.escapeHtml(b.filename)}</span>
                 <span class="text-xs text-gray-400 num">${(b.size / 1024).toFixed(0)} KB · ${b.created_at}</span>
@@ -548,7 +548,7 @@ async function loadClassrooms() {
             box.innerHTML = '<div class="text-gray-300 text-sm">暂无教室，点击右上角「新增教室」添加</div>';
             return;
         }
-        box.innerHTML = `<div class="divide-y" style="border-color:#f1f5f9;">` + classroomCache.map(c => `
+        box.innerHTML = `<div class="divide-y" style="border-color:var(--border-soft);">` + classroomCache.map(c => `
             <div class="flex items-center justify-between py-2.5 flex-wrap gap-2">
                 <div class="flex items-center gap-2.5 flex-wrap">
                     <span class="font-medium text-gray-800 text-sm">${Utils.escapeHtml(c.name)}</span>

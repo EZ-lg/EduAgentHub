@@ -7,11 +7,11 @@
         </h2>
         <div class="flex gap-2 items-center flex-wrap">
             <input type="date" id="sched-date" onchange="loadDaySchedule()"
-                   class="text-sm border rounded-lg py-1.5 px-2" style="border-color:#e2e8f0;">
+                   class="text-sm border rounded-lg py-1.5 px-2" style="border-color:var(--border);">
             <button onclick="goToday()" class="btn-outline" style="padding:6px 12px;font-size:13px;">
                 <svg class="icon icon--md"><use href="#icon-calendar"/></svg> 今天
             </button>
-            <select id="sched-teacher" onchange="loadDaySchedule()" class="text-sm border rounded-lg py-1.5 px-2" style="border-color:#e2e8f0;">
+            <select id="sched-teacher" onchange="loadDaySchedule()" class="text-sm border rounded-lg py-1.5 px-2" style="border-color:var(--border);">
                 <option value="">全部教师</option>
             </select>
         </div>
@@ -116,9 +116,9 @@ function renderGrid(items) {
     let html = '<table class="w-full text-sm" style="table-layout:fixed;border-collapse:separate;border-spacing:0;">';
     // 表头
     html += '<thead><tr>';
-    html += `<th style="background:#4f46e5;color:#fff;padding:8px 6px;font-weight:600;width:92px;">节次</th>`;
+    html += `<th style="background:#6C5CE7;color:#fff;padding:8px 6px;font-weight:600;width:92px;">节次</th>`;
     cols.forEach(c => {
-        html += `<th style="background:#4f46e5;color:#fff;padding:8px 6px;font-weight:600;">${esc(c.name)}</th>`;
+        html += `<th style="background:#6C5CE7;color:#fff;padding:8px 6px;font-weight:600;">${esc(c.name)}</th>`;
     });
     html += '</tr></thead><tbody>';
 
@@ -126,21 +126,21 @@ function renderGrid(items) {
     periods.forEach((p, i) => {
         const odd = i % 2 === 1;
         html += `<tr>`;
-        html += `<td style="background:${odd ? '#eef2ff' : '#f5f7ff'};padding:6px;text-align:center;vertical-align:middle;border-bottom:1px solid #e2e8f0;">
-            <div class="text-sm font-semibold" style="color:#4f46e5;">${esc(p.label || ('第' + (i + 1) + '节'))}</div>
+        html += `<td style="background:${odd ? '#EDEBFE' : '#F4F6FC'};padding:6px;text-align:center;vertical-align:middle;border-bottom:1px solid var(--border);">
+            <div class="text-sm font-semibold" style="color:#6C5CE7;">${esc(p.label || ('第' + (i + 1) + '节'))}</div>
         </td>`;
         cols.forEach(c => {
             const cellItems = items.filter(it => lessonIndexOf(it.start_time, it.end_time) === i && (it.classroom_id || null) === c.id);
-            html += `<td style="border-bottom:1px solid #e2e8f0;border-left:1px solid #f1f5f9;padding:4px;vertical-align:top;">`;
+            html += `<td style="border-bottom:1px solid var(--border);border-left:1px solid var(--border-soft);padding:4px;vertical-align:top;">`;
             cellItems.forEach(it => {
                 const isTerm = it.term_type === 'summer_winter';
-                const st = isTerm ? 'background:#fdf2f8;border-color:#fbcfe8;' : 'background:#eef2ff;border-color:#c7d2fe;';
+                const st = isTerm ? 'background:#fdf2f8;border-color:#fbcfe8;' : 'background:#EDEBFE;border-color:#D6D2FB;';
                 const students = (it.students || []).map(s => s.name).join(' ');
                 html += `<div class="rounded-md border px-1.5 py-1 mb-1" style="${st}">
                     <div class="text-[11px] font-semibold text-gray-800 leading-tight">${esc(it.class_name)}${isTerm ? ' <span class="badge badge--warning" style="font-size:9px;padding:0 3px;">暑假</span>' : ''}</div>
                     <div class="text-[10px] font-medium num" style="color:#dc2626;">${esc(it.start_time)}-${esc(it.end_time)}</div>
-                    <div class="text-[10px] text-gray-500 truncate">👨‍🏫 ${esc(it.teacher_name || '未指派')}</div>
-                    ${students ? `<div class="text-[10px] text-gray-400 truncate" title="${esc(students)}">👥 ${esc(students)}</div>` : ''}
+                    <div class="text-[10px] text-gray-500 truncate"><svg class="icon" style="width:11px;height:11px;color:var(--text-3);vertical-align:-1px;"><use href="#icon-graduation-cap"/></svg> ${esc(it.teacher_name || '未指派')}</div>
+                    ${students ? `<div class="text-[10px] text-gray-400 truncate" title="${esc(students)}"><svg class="icon" style="width:11px;height:11px;color:var(--text-3);vertical-align:-1px;"><use href="#icon-users"/></svg> ${esc(students)}</div>` : ''}
                 </div>`;
             });
             html += `</td>`;

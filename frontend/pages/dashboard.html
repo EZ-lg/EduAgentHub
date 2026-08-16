@@ -2,28 +2,28 @@
 <div class="fade-in">
     <!-- 统计条 -->
     <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6" style="min-width:0;">
-        <div class="stat-card">
+        <div class="stat-card stat-card--blue">
             <div class="stat-icon stat-icon--blue"><svg class="icon"><use href="#icon-users"/></svg></div>
             <div>
                 <div class="stat-value num" id="stat-active-students">0</div>
                 <div class="stat-label">在读学生</div>
             </div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card stat-card--violet">
             <div class="stat-icon stat-icon--violet"><svg class="icon"><use href="#icon-clipboard-list"/></svg></div>
             <div>
                 <div class="stat-value num" id="stat-active-classes">0</div>
                 <div class="stat-label">活跃班级</div>
             </div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card stat-card--pink">
             <div class="stat-icon stat-icon--pink"><svg class="icon"><use href="#icon-calendar"/></svg></div>
             <div>
                 <div class="stat-value num" id="stat-weekly-sessions">0</div>
                 <div class="stat-label">本周课次</div>
             </div>
         </div>
-        <div class="stat-card" style="position:relative;">
+        <div class="stat-card stat-card--red" style="position:relative;">
             <div class="stat-icon stat-icon--red"><svg class="icon"><use href="#icon-zap"/></svg></div>
             <div>
                 <div class="stat-value num" id="stat-pending">0</div>
@@ -31,14 +31,14 @@
             </div>
             <span class="badge badge--danger" id="stat-pending-badge" style="display:none;position:absolute;top:12px;right:12px;">需处理</span>
         </div>
-        <div class="stat-card">
+        <div class="stat-card stat-card--amber">
             <div class="stat-icon stat-icon--amber"><svg class="icon"><use href="#icon-graduation-cap"/></svg></div>
             <div>
                 <div class="stat-value num" id="stat-teachers">0</div>
                 <div class="stat-label">教师数</div>
             </div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card stat-card--green">
             <div class="stat-icon stat-icon--green"><svg class="icon"><use href="#icon-database"/></svg></div>
             <div>
                 <div class="stat-value num" id="stat-total-students">0</div>
@@ -135,8 +135,8 @@ let trendChart = null, distChart = null;
 let studentFlowData = [];      // 后端返回的全部学生卡片
 let studentFilter = 'active';  // 当前筛选：active/completed/abandoned/all
 
-const AVATAR_COLORS = ['#4f46e5', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#14b8a6', '#ef4444'];
-const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#64748b'];
+const AVATAR_COLORS = ['#6C5CE7', '#8B5CF6', '#EC6BAF', '#FF9F45', '#34C48B', '#5B8DEF', '#14B8A6', '#F97316'];
+const CHART_COLORS = ['#6C5CE7', '#8B5CF6', '#EC6BAF', '#FF9F45', '#34C48B', '#5B8DEF'];
 
 function esc(s) { return Utils.escapeHtml(String(s ?? '')); }
 
@@ -176,7 +176,7 @@ function renderPending(list) {
         return;
     }
     box.innerHTML = list.map(c => `
-        <div class="flex items-center justify-between gap-2 py-2 border-b cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1 transition" style="border-color:#f8fafc;" onclick="location.hash='#/classes/${c.id}'">
+        <div class="flex items-center justify-between gap-2 py-2 border-b cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1 transition" style="border-color:var(--border-soft);" onclick="location.hash='#/classes/${c.id}'">
             <div class="min-w-0">
                 <div class="text-sm text-gray-700 font-medium truncate">${esc(c.name)}</div>
                 <div class="text-xs text-gray-400 truncate">${esc(c.subject_name || '未设学科')} · ${esc(c.teacher_name || '未指派教师')}</div>
@@ -194,7 +194,7 @@ function renderToday(list) {
         return;
     }
     box.innerHTML = list.map(c => `
-        <div class="flex items-center justify-between gap-2 py-2 border-b cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1 transition" style="border-color:#f8fafc;" onclick="location.hash='#/schedule'">
+        <div class="flex items-center justify-between gap-2 py-2 border-b cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1 transition" style="border-color:var(--border-soft);" onclick="location.hash='#/schedule'">
             <div class="min-w-0">
                 <div class="text-sm text-gray-700 font-medium truncate">${esc(c.name)}</div>
                 <div class="text-xs text-gray-400">${esc(c.start_time || '')}-${esc(c.end_time || '')} · ${esc(c.classroom_name || '未设教室')} · ${c.student_count} 人</div>
@@ -214,7 +214,7 @@ function renderActivities(list) {
         const who = a.student_name
             ? `<span class="font-medium text-gray-600">${esc(a.student_name)}</span>${a.subject_name ? `<span class="text-gray-300"> · ${esc(a.subject_name)}</span>` : ''}`
             : '';
-        return `<div class="py-2 border-b" style="border-color:#f8fafc;">
+        return `<div class="py-2 border-b" style="border-color:var(--border-soft);">
             <div class="text-sm text-gray-500 truncate">
                 ${who ? who + ' — ' : ''}${esc(a.action)}<span class="text-gray-300 text-xs ml-1">${esc(a.detail)}</span>
             </div>
@@ -281,11 +281,11 @@ function renderCharts(trend, dist) {
             grid: { left: 34, right: 12, top: 20, bottom: 26 },
             tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
             xAxis: { type: 'category', data: trend.map(t => t.label),
-                axisLine: { lineStyle: { color: '#e2e8f0' } }, axisLabel: { color: '#94a3b8', fontSize: 11 } },
-            yAxis: { type: 'value', minInterval: 1, splitLine: { lineStyle: { color: '#f1f5f9' } },
-                axisLabel: { color: '#94a3b8', fontSize: 11 } },
+                axisLine: { lineStyle: { color: '#E3E8F0' } }, axisLabel: { color: '#94A3B8', fontSize: 11 } },
+            yAxis: { type: 'value', minInterval: 1, splitLine: { lineStyle: { color: '#EFF3F8' } },
+                axisLabel: { color: '#94A3B8', fontSize: 11 } },
             series: [{ type: 'bar', data: trend.map(t => t.count), barWidth: '45%',
-                itemStyle: { color: '#4f46e5', borderRadius: [4, 4, 0, 0] } }],
+                itemStyle: { color: '#6C5CE7', borderRadius: [6, 6, 0, 0] } }],
         });
     }
 
@@ -303,7 +303,7 @@ function renderCharts(trend, dist) {
                 type: 'pie', radius: ['45%', '68%'], center: ['50%', '42%'],
                 itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
                 label: { color: '#64748b', fontSize: 11 },
-                data: data.length ? data : [{ name: '暂无', value: 1, itemStyle: { color: '#e2e8f0' } }],
+                data: data.length ? data : [{ name: '暂无', value: 1, itemStyle: { color: '#E3E8F0' } }],
             }],
         });
     }

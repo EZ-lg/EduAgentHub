@@ -6,7 +6,7 @@
             <div style="position:relative;">
                 <svg class="icon icon--sm" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;"><use href="#icon-search"/></svg>
                 <input id="teacher-search" type="text" placeholder="搜索姓名/科目" oninput="searchTeachers(this.value)"
-                       class="text-sm border rounded-lg py-1.5" style="width:200px;border-color:#e2e8f0;padding-left:30px;">
+                       class="text-sm border rounded-lg py-1.5" style="width:200px;border-color:var(--border);padding-left:30px;">
             </div>
             <button onclick="showAddTeacherModal()" class="btn-primary" style="padding:6px 16px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-plus"/></svg> 新增教师</button>
         </div>
@@ -74,7 +74,7 @@ async function loadTeachers() {
     empty.classList.add('hidden');
     table.classList.remove('hidden');
     box.innerHTML = teacherList.map(t => `
-        <tr class="border-b align-top" style="border-color:#f1f5f9;">
+        <tr class="border-b align-top" style="border-color:var(--border-soft);">
             <td class="py-2.5 font-medium text-gray-800">${esc(t.name)}</td>
             <td class="py-2.5">
                 ${parseSubjects(t.subjects).map(s => `<span class="badge badge--info mr-1 mb-1">${esc(s)}</span>`).join('') || '<span class="text-gray-300">-</span>'}

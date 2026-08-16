@@ -14,7 +14,7 @@
                     <button class="term-btn" data-term="summer_winter" onclick="setTermFilter('summer_winter')" style="padding:4px 12px;font-size:12px;border-radius:6px;">寒暑假班</button>
                     <button class="term-btn" data-term="semester" onclick="setTermFilter('semester')" style="padding:4px 12px;font-size:12px;border-radius:6px;">学期跟班</button>
                 </div>
-                <select id="class-status-filter" onchange="loadClasses()" class="text-sm border rounded-lg py-1.5 px-2" style="border-color:#e2e8f0;">
+                <select id="class-status-filter" onchange="loadClasses()" class="text-sm border rounded-lg py-1.5 px-2" style="border-color:var(--border);">
                     <option value="">全部状态</option>
                     <option value="active">在读</option>
                     <option value="paused">已停用</option>
@@ -100,7 +100,7 @@
             <div id="schedule-list"></div>
 
             <!-- 空闲时段查看器（点空闲格 → 弹窗确认，可微调具体时间） -->
-            <div id="slot-picker" class="hidden mt-3 rounded-lg border p-4" style="border-color:#e2e8f0;background:#fafbff;">
+            <div id="slot-picker" class="hidden mt-3 rounded-lg border p-4" style="border-color:var(--border);background:var(--surface-hover);">
                 <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
                     <div class="text-sm font-semibold text-gray-700">空闲时段查看</div>
                     <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1" id="slot-weekday-bar"></div>
@@ -169,7 +169,7 @@ async function loadClasses() {
         empty.classList.add('hidden');
         grid.classList.remove('hidden');
         grid.innerHTML = list.map(c => `
-            <div class="border rounded-xl p-4 cursor-pointer hover:shadow-md transition-shadow" style="border-color:#e2e8f0;background:#fff;" onclick="openClassDetail(${c.id})">
+            <div class="border rounded-xl p-4 cursor-pointer hover:shadow-md transition-shadow" style="border-color:var(--border);background:#fff;" onclick="openClassDetail(${c.id})">
                 <div class="flex items-start justify-between gap-2">
                     <div class="font-semibold text-gray-800 text-sm">${esc(c.name)}</div>
                     <div class="flex flex-col items-end gap-1 flex-shrink-0">
@@ -179,19 +179,19 @@ async function loadClasses() {
                         </div>
                         ${c.status === 'active'
                             ? '<span class="badge" style="background:#ecfdf5;color:#059669;border-color:#a7f3d0;">在读</span>'
-                            : '<span class="badge" style="background:#f1f5f9;color:#64748b;border-color:#e2e8f0;">已停用</span>'}
+                            : '<span class="badge" style="background:var(--border-soft);color:#64748b;border-color:var(--border);">已停用</span>'}
                     </div>
                 </div>
                 <div class="text-xs text-gray-500 mt-3 space-y-1">
-                    <div>📘 学科：${esc(c.subject_name || '未设置')}</div>
-                    <div>👨‍🏫 教师：${esc(c.teacher_name || '未指派')}</div>
-                    <div>🏫 教室：${esc(c.classroom_name || '未设置')}</div>
+                    <div><svg class="icon icon--sm" style="color:var(--text-3);"><use href="#icon-book-open"/></svg> 学科：${esc(c.subject_name || '未设置')}</div>
+                    <div><svg class="icon icon--sm" style="color:var(--text-3);"><use href="#icon-graduation-cap"/></svg> 教师：${esc(c.teacher_name || '未指派')}</div>
+                    <div><svg class="icon icon--sm" style="color:var(--text-3);"><use href="#icon-building"/></svg> 教室：${esc(c.classroom_name || '未设置')}</div>
                 </div>
-                <div class="flex items-center gap-3 mt-3 pt-3 border-t text-xs text-gray-400" style="border-color:#f1f5f9;">
-                    <span>👥 ${c.student_count} 人</span>
+                <div class="flex items-center gap-3 mt-3 pt-3 border-t text-xs text-gray-400" style="border-color:var(--border-soft);">
+                    <span><svg class="icon icon--sm" style="color:var(--text-3);"><use href="#icon-users"/></svg> ${c.student_count} 人</span>
                     ${c.term_type === 'summer_winter'
-                        ? `<span>🗓 每天 ${esc(c.daily_start)}-${esc(c.daily_end)} · ${c.total_lessons} 天</span>`
-                        : `<span>🗓 ${c.weekly_frequency} 次/周</span>`}
+                        ? `<span><svg class="icon icon--sm" style="color:var(--text-3);"><use href="#icon-calendar"/></svg> 每天 ${esc(c.daily_start)}-${esc(c.daily_end)} · ${c.total_lessons} 天</span>`
+                        : `<span><svg class="icon icon--sm" style="color:var(--text-3);"><use href="#icon-calendar"/></svg> ${c.weekly_frequency} 次/周</span>`}
                 </div>
             </div>`).join('');
     } catch (e) {
@@ -225,7 +225,7 @@ async function loadClassDetail() {
     if (c.status === 'active') {
         st.textContent = '在读'; st.style.cssText = 'background:#ecfdf5;color:#059669;border-color:#a7f3d0;';
     } else {
-        st.textContent = '已停用'; st.style.cssText = 'background:#f1f5f9;color:#64748b;border-color:#e2e8f0;';
+        st.textContent = '已停用'; st.style.cssText = 'background:var(--border-soft);color:#64748b;border-color:var(--border);';
     }
     document.getElementById('btn-toggle-status').innerHTML = c.status === 'active'
         ? '<svg class="icon icon--md"><use href="#icon-pause"/></svg> 停用'
@@ -261,7 +261,7 @@ function renderTermClass() {
     box.classList.remove('hidden');
     document.getElementById('schedule-list').innerHTML = '';
     box.innerHTML = `
-        <div class="rounded-lg border p-3" style="border-color:#e2e8f0;background:#fafbff;">
+        <div class="rounded-lg border p-3" style="border-color:var(--border);background:var(--surface-hover);">
             <div class="flex items-center justify-between flex-wrap gap-2">
                 <div class="flex items-center gap-2 flex-wrap text-sm">
                     <span class="badge badge--warning">寒暑假班</span>
@@ -334,7 +334,7 @@ function renderStudents() {
             <th style="width:40%;">姓名</th><th style="width:20%;">年级</th>
             <th style="width:25%;">入班日期</th><th style="width:15%;">操作</th>
         </tr></thead><tbody>` + list.map(s => `
-        <tr class="border-b align-top" style="border-color:#f1f5f9;">
+        <tr class="border-b align-top" style="border-color:var(--border-soft);">
             <td class="py-2.5 font-medium text-gray-800">${esc(s.name)}</td>
             <td class="py-2.5 text-gray-500">${esc(s.grade || '-')}</td>
             <td class="py-2.5 text-gray-500">${s.enroll_date ? Utils.formatDate(s.enroll_date, true) : '-'}</td>
@@ -507,7 +507,7 @@ async function loadScheduleList() {
             return;
         }
         box.innerHTML = scheduleList.map(s => `
-            <div class="flex items-center justify-between py-2 border-b text-sm flex-wrap gap-2" style="border-color:#f1f5f9;">
+            <div class="flex items-center justify-between py-2 border-b text-sm flex-wrap gap-2" style="border-color:var(--border-soft);">
                 <div class="flex items-center gap-2 flex-wrap">
                     <span class="badge badge--info">${WEEK_NAMES[s.weekday]}</span>
                     <span class="font-medium text-gray-800 num">${s.start_time}-${s.end_time}</span>
@@ -577,7 +577,7 @@ function showClassErrorModal(msg) {
 // 排课冲突弹窗：明确显示哪一天哪节课和哪个班级冲突
 function showConflictModal(conflicts, title = '排课冲突') {
     const list = (conflicts || []).map(c => `
-        <div class="flex items-start gap-2 py-1.5 border-b text-sm" style="border-color:#f1f5f9;">
+        <div class="flex items-start gap-2 py-1.5 border-b text-sm" style="border-color:var(--border-soft);">
             <span class="badge ${c.type === 'classroom' ? 'badge--danger' : (c.type === 'teacher' ? 'badge--warning' : 'badge--neutral')} shrink-0">${c.type === 'classroom' ? '教室' : c.type === 'teacher' ? '教师' : '学生'}</span>
             <span class="text-gray-700">${esc(c.time || '')}：${esc(c.message || '冲突')}</span>
         </div>`).join('');
