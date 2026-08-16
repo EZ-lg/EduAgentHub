@@ -197,6 +197,7 @@ def _class_summary(db: Session, cls: Class) -> dict:
         "name": cls.name,
         "class_type": cls.class_type,
         "term_type": cls.term_type,
+        "status": cls.status,
         "subject_name": cls.subject_name or "",
         "teacher_name": teacher.name if teacher else "",
         "classroom_name": room.name if room else "",

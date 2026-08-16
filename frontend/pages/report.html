@@ -13,6 +13,7 @@
             <button onclick="editTitle()" class="btn-outline" style="padding:7px 12px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-pencil"/></svg> 标题</button>
             <button onclick="regenerateAll()" class="btn-outline" style="padding:7px 12px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-rotate-cw"/></svg> 重新生成</button>
             <button onclick="showPlanVersions()" class="btn-outline" style="padding:7px 12px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-history"/></svg> 规划版本</button>
+            <button onclick="togglePublish()" id="btn-toggle-publish" class="btn-outline" style="padding:7px 12px;font-size:13px;color:#059669;border-color:#a7f3d0;"></button>
             <button onclick="exportDocx()" class="btn-primary" style="padding:7px 12px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-file-text"/></svg> 导出 Word</button>
             <button onclick="deleteReport()" class="btn-outline btn-danger-outline" style="padding:7px 12px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-trash-2"/></svg> 删除</button>
         </div>
@@ -127,6 +128,16 @@ function renderReport(preserveInputs = true) {
     document.getElementById('report-head-title').textContent = r.title || '学习计划';
     document.getElementById('report-status-badge').innerHTML =
         `<span class="${status.cls}">${status.text}</span>`;
+    // 发布/撤回按钮：draft → 发布；published → 撤回
+    const pubBtn = document.getElementById('btn-toggle-publish');
+    if (pubBtn) {
+        pubBtn.innerHTML = r.status === 'published'
+            ? '<svg class="icon icon--md"><use href="#icon-undo-2"/></svg> 撤回'
+            : '<svg class="icon icon--md"><use href="#icon-send"/></svg> 发布';
+        pubBtn.style.cssText = 'padding:7px 12px;font-size:13px;' + (r.status === 'published'
+            ? 'color:#059669;border-color:#a7f3d0;'
+            : 'color:#4f46e5;border-color:#c7d2fe;');
+    }
     document.getElementById('report-source-badge').textContent = 'AI 生成';
 
     document.getElementById('pdf-org').textContent = state.orgName;
@@ -165,16 +176,16 @@ function buildSectionsHtml() {
     const parts = [];
     // 副标题
     if (c.subtitle) parts.push(`<div class="report-subtitle">${esc(c.subtitle)}</div>`);
-    // 方法总纲（红色 callout）
+    // 方法总纲（红色左边条 callout）
     if (c.summary) parts.push(`<div class="report-callout">
-            <div class="flex items-center justify-between mb-1">
-                <span class="inline-flex items-center gap-1.5"><svg class="icon icon--md"><use href="#icon-list-ordered"/></svg> 方法总纲</span>
+            <div class="flex items-center justify-between">
+                <span class="callout-title"><svg class="icon icon--md mr-1.5"><use href="#icon-list-ordered"/></svg> 方法总纲</span>
                 <div class="flex gap-1 edit-btn">
                     <button onclick="editSummary()" class="btn-outline btn-sm" style="padding:3px 9px;font-size:11px;"><svg class="icon icon--sm"><use href="#icon-pencil"/></svg> 编辑</button>
                     <button onclick="regenerateSummary()" class="btn-outline btn-sm" style="padding:3px 9px;font-size:11px;"><svg class="icon icon--sm"><use href="#icon-rotate-cw"/></svg> 重生成</button>
                 </div>
             </div>
-            <div style="white-space:pre-wrap;">${esc(c.summary)}</div>
+            <div class="callout-body">${esc(c.summary)}</div>
         </div>`);
     // 章节
     c.chapters.forEach((ch, i) => {
@@ -186,16 +197,16 @@ function buildSectionsHtml() {
             parts.push(renderChapterHtml(i, ch));
         }
     });
-    // 写在最后（红色 callout）
+    // 写在最后（红色左边条 callout）
     if (c.conclusion) parts.push(`<div class="report-callout">
-            <div class="flex items-center justify-between mb-1">
-                <span class="inline-flex items-center gap-1.5"><svg class="icon icon--md"><use href="#icon-pen-line"/></svg> 写在最后</span>
+            <div class="flex items-center justify-between">
+                <span class="callout-title"><svg class="icon icon--md mr-1.5"><use href="#icon-pen-line"/></svg> 写在最后</span>
                 <div class="flex gap-1 edit-btn">
                     <button onclick="editConclusion()" class="btn-outline btn-sm" style="padding:3px 9px;font-size:11px;"><svg class="icon icon--sm"><use href="#icon-pencil"/></svg> 编辑</button>
                     <button onclick="regenerateConclusion()" class="btn-outline btn-sm" style="padding:3px 9px;font-size:11px;"><svg class="icon icon--sm"><use href="#icon-rotate-cw"/></svg> 重生成</button>
                 </div>
             </div>
-            <div style="white-space:pre-wrap;">${esc(c.conclusion)}</div>
+            <div class="callout-body">${esc(c.conclusion)}</div>
         </div>`);
     return parts.join('');
 }
@@ -254,10 +265,10 @@ function renderPlanChapterHtml(i, ch) {
             <div class="mt-1 overflow-x-auto">
                 <table class="w-full text-sm" style="min-width:720px;">
                     <thead>
-                        <tr><th style="width:90px;">课时</th><th>课程内容</th><th style="width:70px;">课时数</th><th style="width:120px;">教师</th><th style="width:160px;">时间安排</th><th style="width:130px;">备注</th><th style="width:40px;"></th></tr>
+                        <tr><th style="width:90px;">课时</th><th>课程内容</th><th style="width:70px;">课时数</th><th style="width:120px;">教师</th><th style="width:130px;">备注</th><th style="width:40px;"></th></tr>
                     </thead>
                     <tbody id="plan-tbody">
-                        ${plan.map((row, j) => planRowHtml(row, j)).join('') || '<tr><td colspan="7" class="text-center text-gray-400 py-4">暂无课程规划，点击下方「➕ 新增行」添加</td></tr>'}
+                        ${plan.map((row, j) => planRowHtml(row, j)).join('') || '<tr><td colspan="6" class="text-center text-gray-400 py-4">暂无课程规划，点击下方「➕ 新增行」添加</td></tr>'}
                     </tbody>
                 </table>
             </div>
@@ -279,7 +290,6 @@ function planRowHtml(row, i) {
             <td><input data-plan="content" data-i="${i}" value="${esc(row.content)}" class="w-full" placeholder="课程内容"></td>
             <td><input data-plan="hours" data-i="${i}" type="number" min="0" value="${row.hours ?? ''}" class="w-full" style="min-width:50px;"></td>
             <td><select data-plan="teacher_id" data-i="${i}" class="w-full">${teacherOpts}</select></td>
-            <td><input data-plan="schedule" data-i="${i}" value="${esc(row.schedule)}" class="w-full" style="min-width:120px;" placeholder="每周一 18:00"></td>
             <td><input data-plan="notes" data-i="${i}" value="${esc(row.notes)}" class="w-full" style="min-width:100px;"></td>
             <td><button onclick="deletePlanRow(${i})" class="icon-btn icon-btn--danger" title="删除该行"><svg class="icon"><use href="#icon-trash-2"/></svg></button></td>
         </tr>`;
@@ -503,6 +513,23 @@ async function persistReport(extraPayload, planRows, planReason) {
     }
 }
 
+async function togglePublish() {
+    if (state.busy) return;
+    const next = state.report.status === 'published' ? 'draft' : 'published';
+    state.busy = true;
+    try {
+        const res = await API.reports.update(reportId, { status: next });
+        if (!res.success) throw new Error(res.error);
+        state.report = res.data;
+        renderReport();
+        showToast(next === 'published' ? '报告已发布' : '已撤回为草稿', 'success');
+    } catch (e) {
+        showToast('操作失败：' + e.message, 'error');
+    } finally {
+        state.busy = false;
+    }
+}
+
 function deleteReport() {
     Utils.confirmDialog({
         title: '删除报告',
@@ -576,7 +603,6 @@ async function previewPlanVersion(planId) {
                 <span class="ml-2 text-gray-600">${esc(r.content)}</span>
                 <span class="ml-2 text-xs text-gray-400">${r.hours ?? ''}课时</span>
                 <span class="ml-2 text-xs text-gray-400">${esc(r.teacher_name || '')}</span>
-                <span class="ml-2 text-xs text-gray-400">${esc(r.schedule || '')}</span>
             </div>`).join('') : '') + `</div>`;
         Utils.showModal({
             title: `规划 v${plan.version} 预览`,
@@ -663,6 +689,7 @@ Object.assign(window, {
     exportDocx, deleteReport, editSection, regenerateSection,
     editSummary, regenerateSummary, editConclusion, regenerateConclusion,
     addPlanRow, savePlan, deletePlanRow, previewPlanVersion, assignTeacherAll,
+    togglePublish,
 });
 })();
 </script>

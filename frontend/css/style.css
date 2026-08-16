@@ -499,18 +499,29 @@ input:focus, select:focus, textarea:focus {
 }
 #pdf-meta span { margin: 0 6px; }
 
-/* 报告方法总纲/写在最后（红色 callout，对应模板风格） */
+/* 报告方法总纲/写在最后（与章节卡协调的 callout：白卡 + 红色左边条 + 醒目标题） */
 .report-callout {
-    background: var(--danger-soft);
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-left: 4px solid #c0392b;
-    padding: 10px 14px;
-    border-radius: 6px;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    line-height: 1.75;
+    white-space: pre-wrap;
+}
+.report-callout .callout-title {
     color: #c0392b;
     font-weight: 600;
     font-size: 14px;
-    margin-bottom: 14px;
-    line-height: 1.7;
-    white-space: pre-wrap;
+    display: flex;
+    align-items: center;
+}
+.report-callout .callout-body {
+    color: #374151;
+    font-size: 15px;
+    font-weight: 400;
+    margin-top: 8px;
 }
 .report-subtitle {
     color: #555555; font-size: 14px; text-align: center;

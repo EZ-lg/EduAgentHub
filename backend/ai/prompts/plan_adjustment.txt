@@ -12,9 +12,9 @@
 {% endif %}
 
 【调整要求】
-- 保持规划覆盖整个学期、8-20 条；字段齐全：lesson / content / hours / teacher_id / schedule / notes；hours 填数字。
-- **机构课时规范（必须遵守）**：每节课固定 {{ lesson_hours }} 小时，每行 hours 一律填 {{ lesson_hours }}；寒暑假每周上 {{ weekly_days }} 天课、{{ off_day }} 休息，schedule 按此连续编排；学期中按「每周末」编排。
-- 依据成绩分析调整：薄弱点所在章节增加课时、前移；表现好的章节适当减量但保留覆盖。若【成绩分析】为"暂无成绩数据"，则主要优化规划结构（课次节奏、内容衔接、时间安排），不臆造成绩相关内容。
+- 保持规划覆盖整个学期、8-20 条；字段：lesson / content / hours / teacher_id / notes；hours 填数字。
+- **机构课时规范（必须遵守）**：每节课固定 {{ lesson_hours }} 小时，每行 hours 一律填 {{ lesson_hours }}；不要 schedule 字段，不写具体上课时间（由机构课表统一安排）。
+- 依据成绩分析调整：薄弱点所在章节增加课时、前移；表现好的章节适当减量但保留覆盖。若【成绩分析】为"暂无成绩数据"，则主要优化规划结构（课次节奏、内容衔接），不臆造成绩相关内容。
 - teacher_id 一律为 null（由教务后续统一指派教师），除非原规划该行已指定且应沿用。
 - 只依据成绩分析与当前规划调整，不编造。
 - reason —— 用 1-2 句话说明本次调整的原因（哪些成绩变化 → 对应做了哪些课时/顺序调整）。
@@ -23,7 +23,7 @@
 {
   "reason": "……",
   "plan": [
-    {"lesson": "第1课", "content": "课程内容", "hours": 2, "teacher_id": null, "schedule": "每周六 09:00-11:00", "notes": ""}
+    {"lesson": "第1课", "content": "课程内容", "hours": {{ lesson_hours }}, "teacher_id": null, "notes": ""}
   ]
 }
 

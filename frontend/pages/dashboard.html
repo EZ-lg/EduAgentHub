@@ -54,6 +54,28 @@
         <a href="#/schedule" class="btn-outline" style="text-decoration:none;"><svg class="icon icon--md"><use href="#icon-calendar"/></svg> 课表</a>
     </div>
 
+    <!-- 趋势图表（可选区块） -->
+    <div class="panel mb-6">
+        <div class="flex items-center justify-between mb-3">
+            <div class="panel-title mb-0"><svg class="icon icon--md text-indigo-500"><use href="#icon-trending-up"/></svg> 数据趋势</div>
+            <button onclick="toggleCharts()" class="btn-outline" style="padding:4px 12px;font-size:12px;" id="btn-toggle-charts">
+                <svg class="icon icon--sm"><use href="#icon-chevron-down"/></svg> 收起
+            </button>
+        </div>
+        <div id="chart-area">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                    <div class="text-sm text-gray-600 mb-2 inline-flex items-center gap-1.5"><svg class="icon icon--sm"><use href="#icon-trending-up"/></svg> 近 6 个月新增学生</div>
+                    <div id="trend-chart" style="height:220px;"></div>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-600 mb-2 inline-flex items-center gap-1.5"><svg class="icon icon--sm"><use href="#icon-pie-chart"/></svg> 学科分布（活跃学科）</div>
+                    <div id="dist-chart" style="height:220px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 待办区 -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6" style="align-items:start;">
         <!-- 待排课 -->
@@ -85,41 +107,24 @@
         </div>
     </div>
 
-    <!-- 学生卡片流 -->
+    <!-- 学生档案 · 学生总览（学生卡片流） -->
     <div class="panel">
         <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <div class="panel-title mb-0"><svg class="icon icon--md text-indigo-500"><use href="#icon-users"/></svg> 学生总览 <span class="text-xs font-normal text-gray-400 num" id="student-flow-count"></span></div>
-            <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1" id="student-flow-filter">
-                <button class="term-btn active" data-sf="active" onclick="setStudentFilter('active')" style="padding:4px 12px;font-size:12px;border-radius:6px;">在读</button>
-                <button class="term-btn" data-sf="completed" onclick="setStudentFilter('completed')" style="padding:4px 12px;font-size:12px;border-radius:6px;">已结课</button>
-                <button class="term-btn" data-sf="abandoned" onclick="setStudentFilter('abandoned')" style="padding:4px 12px;font-size:12px;border-radius:6px;">已放弃</button>
-                <button class="term-btn" data-sf="all" onclick="setStudentFilter('all')" style="padding:4px 12px;font-size:12px;border-radius:6px;">全部</button>
+            <div class="panel-title mb-0">
+                <svg class="icon icon--md text-indigo-500"><use href="#icon-users"/></svg> 学生档案 · 学生总览 <span class="text-xs font-normal text-gray-400 num" id="student-flow-count"></span>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                <a href="#/students" class="text-xs text-indigo-500 hover:text-indigo-700 inline-flex items-center gap-1 font-medium">去学生档案 <svg class="icon icon--sm"><use href="#icon-chevron-right"/></svg></a>
+                <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1" id="student-flow-filter">
+                    <button class="term-btn active" data-sf="active" onclick="setStudentFilter('active')" style="padding:4px 12px;font-size:12px;border-radius:6px;">在读</button>
+                    <button class="term-btn" data-sf="completed" onclick="setStudentFilter('completed')" style="padding:4px 12px;font-size:12px;border-radius:6px;">已结课</button>
+                    <button class="term-btn" data-sf="abandoned" onclick="setStudentFilter('abandoned')" style="padding:4px 12px;font-size:12px;border-radius:6px;">已放弃</button>
+                    <button class="term-btn" data-sf="all" onclick="setStudentFilter('all')" style="padding:4px 12px;font-size:12px;border-radius:6px;">全部</button>
+                </div>
             </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3" id="student-card-grid">
             <div class="col-span-full text-center py-8 text-gray-300 text-sm">加载中...</div>
-        </div>
-    </div>
-
-    <!-- 趋势图表（可选区块） -->
-    <div class="panel">
-        <div class="flex items-center justify-between mb-3">
-            <div class="panel-title mb-0"><svg class="icon icon--md text-indigo-500"><use href="#icon-trending-up"/></svg> 数据趋势</div>
-            <button onclick="toggleCharts()" class="btn-outline" style="padding:4px 12px;font-size:12px;" id="btn-toggle-charts">
-                <svg class="icon icon--sm"><use href="#icon-chevron-down"/></svg> 收起
-            </button>
-        </div>
-        <div id="chart-area">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div>
-                    <div class="text-sm text-gray-600 mb-2 inline-flex items-center gap-1.5"><svg class="icon icon--sm"><use href="#icon-trending-up"/></svg> 近 6 个月新增学生</div>
-                    <div id="trend-chart" style="height:220px;"></div>
-                </div>
-                <div>
-                    <div class="text-sm text-gray-600 mb-2 inline-flex items-center gap-1.5"><svg class="icon icon--sm"><use href="#icon-pie-chart"/></svg> 学科分布（活跃学科）</div>
-                    <div id="dist-chart" style="height:220px;"></div>
-                </div>
-            </div>
         </div>
     </div>
 </div>

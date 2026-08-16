@@ -20,9 +20,9 @@
 只输出一个 JSON 对象，不要 markdown 代码围栏，不要任何其他文字。
 {% if section %}
 - 若 section 为「summary」：输出 {"summary": "方法总纲：……"}
-- 若 section 为「六、本学科落地规划」：输出 {"chapters": [{"title": "六、本学科落地规划", "content": "……"}], "plan": [{"lesson","content","hours","teacher_id","schedule","notes"}]}（章节文字 + 配套课程规划表格一起输出，字段齐全，teacher_id=null）
+- 若 section 为「六、本学科落地规划」：输出 {"chapters": [{"title": "六、本学科落地规划", "content": "……"}], "plan": [{"lesson","content","hours","teacher_id","notes"}]}（章节文字 + 配套课程规划表格一起输出，字段齐全，teacher_id=null）
 - 若 section 为「一、」…「十、」中的其他某一章：输出 {"chapters": [{"title": "该章标题", "content": "……"}]}（只含目标章）
-- 若 section 为「plan」：输出 {"plan": [{"lesson","content","hours","teacher_id","schedule","notes"}]}（8-20 条，字段齐全，teacher_id=null）
+- 若 section 为「plan」：输出 {"plan": [{"lesson","content","hours","teacher_id","notes"}]}（8-20 条，字段齐全，teacher_id=null）
 - 若 section 为「conclusion」：输出 {"conclusion": "写在最后：……"}
 {% else %}
 - 输出与完整生成相同的结构：
@@ -32,5 +32,6 @@
 【约束】
 - 章节级重生成时，只改动目标章节，其余保持原样；补充信息中未提及的内容尽量沿用原计划。
 - plan 数组维持覆盖整个学期，薄弱点着重；只依据原计划与补充信息，不编造。
-- **机构课时规范（必须遵守）**：每节课固定 {{ lesson_hours }} 小时，plan 每行 hours 一律填 {{ lesson_hours }}；寒暑假每周上 {{ weekly_days }} 天课、{{ off_day }} 休息，schedule 按此连续编排；学期中按「每周末」编排。
+- **机构课时规范（必须遵守）**：每节课固定 {{ lesson_hours }} 小时，plan 每行 hours 一律填 {{ lesson_hours }}；不要 schedule 字段，不写具体上课时间（由机构课表统一安排）。
+- **内容去重**：只输出目标章节自身的主题内容，不要重复其他章节已写过的信息（尤其日程/时间/计划细节），避免局部重生成后与其它章节冲突。
 - content 用第三人称、通俗可读。

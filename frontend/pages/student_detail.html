@@ -987,10 +987,10 @@ function buildPlanHtml() {
                 <table class="w-full text-sm" style="min-width:720px;">
                     <thead><tr>
                         <th style="width:90px;">课时</th><th>课程内容</th><th style="width:70px;">课时数</th>
-                        <th style="width:120px;">教师</th><th style="width:160px;">时间安排</th><th style="width:130px;">备注</th><th style="width:40px;"></th>
+                        <th style="width:120px;">教师</th><th style="width:130px;">备注</th><th style="width:40px;"></th>
                     </tr></thead>
                     <tbody id="plan-tbody">
-                        ${planRows.map((row, j) => planRowHtmlTab(row, j)).join('') || '<tr><td colspan="7" class="text-center text-gray-400 py-4">暂无课程，点击下方「➕ 新增行」</td></tr>'}
+                        ${planRows.map((row, j) => planRowHtmlTab(row, j)).join('') || '<tr><td colspan="6" class="text-center text-gray-400 py-4">暂无课程，点击下方「➕ 新增行」</td></tr>'}
                     </tbody>
                 </table>
             </div>
@@ -1011,7 +1011,6 @@ function planRowHtmlTab(row, i) {
             <td><input data-plan="content" data-i="${i}" value="${esc(row.content)}" class="w-full" placeholder="课程内容"></td>
             <td><input data-plan="hours" data-i="${i}" type="number" min="0" value="${row.hours ?? ''}" class="w-full" style="min-width:50px;"></td>
             <td><select data-plan="teacher_id" data-i="${i}" class="w-full">${teacherOpts}</select></td>
-            <td><input data-plan="schedule" data-i="${i}" value="${esc(row.schedule)}" class="w-full" style="min-width:120px;" placeholder="每周一 18:00"></td>
             <td><input data-plan="notes" data-i="${i}" value="${esc(row.notes)}" class="w-full" style="min-width:100px;"></td>
             <td><button onclick="deletePlanRowTab(${i})" class="icon-btn icon-btn--danger" title="删除该行"><svg class="icon"><use href="#icon-trash-2"/></svg></button></td>
         </tr>`;
@@ -1189,7 +1188,6 @@ async function previewPlanVersion(planId) {
             <span class="ml-2 text-gray-600">${esc(r.content)}</span>
             <span class="ml-2 text-xs text-gray-400">${r.hours ?? ''}课时</span>
             <span class="ml-2 text-xs text-gray-400">${esc(r.teacher_name || '')}</span>
-            <span class="ml-2 text-xs text-gray-400">${esc(r.schedule || '')}</span>
         </div>`).join('') : '') + `</div>`;
     Utils.showModal({ title: `规划 v${v.version} 预览`, width: 600, hideOk: true, bodyHtml: html });
 }
@@ -1341,11 +1339,29 @@ if (routeSubjectId) {
     renderSubjectTab('report');  // 首次进入默认报告 Tab
 }
 
+/* ---------- 学科切换（修 bug：同一 subject 路由内参数变化时组件不重挂载，手动响应） ----------
+ * #/student/2/subject/3 → #/student/2/subject/4 是同一路由记录，Vue Router 复用组件实例，
+ * 页面脚本不会重跑，需监听 hashchange 检测 sid 变化并重新初始化学科详情区。
+ */
+function onSubjectHashChange() {
+    const parts = location.hash.split('/');
+    if (!(parts[1] === 'student' && parts[3] === 'subject' && parts[4])) return;
+    const sid = parseInt(parts[4]);
+    if (!sid || sid === currentSubjectId) return;
+    currentSubjectId = sid;
+    if (overviewData && Array.isArray(overviewData.subjects)) renderSubjectCards(overviewData);  // 移动学科卡高亮
+    document.getElementById('subject-detail-area').classList.remove('hidden');
+    document.getElementById('back-to-overview').classList.remove('hidden');
+    renderSubjectTab(currentSubjectTab);   // 保留用户当前所在 Tab
+}
+window.addEventListener('hashchange', onSubjectHashChange);
+
 /* ---------- 页面卸载钩子（app.js unmounted 调用）：释放 ECharts 实例 + resize 监听 ---------- */
 window.addEventListener('resize', onScoreChartResize);
 window.__pageUnmounted = function () {
     disposeScoreChart();
     window.removeEventListener('resize', onScoreChartResize);
+    window.removeEventListener('hashchange', onSubjectHashChange);
     window.__pageUnmounted = null;
 };
 
