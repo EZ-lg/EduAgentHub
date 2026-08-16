@@ -34,13 +34,42 @@ from backend.services.term_schedule import compute_end_date
 
 router = APIRouter(prefix="/api/schedules", tags=["schedules"])
 
-# 默认节次模板（每天 5 个时段）
+WEEKDAY_CN = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+
+
+def _enrich_conflicts(db, conflicts, weekday=None, start=None, end=None):
+    """给冲突列表补全信息：冲突班级名 + 具体时间，让前端明确提示「哪一天哪节课和哪个班冲突」"""
+    out = []
+    for c in conflicts or []:
+        c = dict(c)
+        cid = c.get("with_class_id")
+        name = ""
+        if cid:
+            row = db.query(Class).filter(Class.id == cid).first()
+            name = row.name if row else ""
+        c["with_class_name"] = name
+        # 时间描述：优先 on_item（批量校验），其次新排课的时间
+        item = c.get("on_item") or {}
+        t_wd = item.get("weekday")
+        t_start = item.get("start_time")
+        t_end = item.get("end_time")
+        if t_wd is None and weekday is not None:
+            t_wd, t_start, t_end = weekday, start, end
+        time_desc = ""
+        if t_wd is not None:
+            time_desc = f"{WEEKDAY_CN[t_wd] if 0 <= t_wd <= 6 else t_wd} {t_start or '?'}-{t_end or '?'}"
+        c["time"] = time_desc
+        if name:
+            c["message"] = f"{time_desc}：{name} {c.get('message', '占用')}"
+        out.append(c)
+    return out
+
+# 默认节次模板（机构白天上课，晚上不上：上午一二节 + 下午三四节）
 DEFAULT_PERIODS = [
-    {"label": "上午①", "start": "08:00", "end": "10:00"},
-    {"label": "上午②", "start": "10:10", "end": "12:10"},
-    {"label": "下午①", "start": "14:00", "end": "16:00"},
-    {"label": "下午②", "start": "16:10", "end": "18:10"},
-    {"label": "晚自习", "start": "19:00", "end": "21:00"},
+    {"label": "上午一", "start": "08:00", "end": "10:00"},
+    {"label": "上午二", "start": "10:10", "end": "12:10"},
+    {"label": "下午三", "start": "14:00", "end": "16:00"},
+    {"label": "下午四", "start": "16:10", "end": "18:10"},
 ]
 PERIODS_KEY = "class_periods"
 
@@ -341,7 +370,7 @@ def confirm_plan(data: dict, db: Session = Depends(get_db)):
         r["student_ids"] = _class_student_ids(db, r["class_id"])
     conflicts = scheduler.check_conflicts_batch(existing + new_items)
     if conflicts:
-        return success_response({"confirmed": False, "conflicts": conflicts,
+        return success_response({"confirmed": False, "conflicts": _enrich_conflicts(db, conflicts),
                                  "message": "存在时间冲突，请调整后再确认"})
 
     # 该班旧 active 课次 → archived
@@ -410,7 +439,10 @@ def add_schedule(data: dict, db: Session = Depends(get_db)):
         r["student_ids"] = _class_student_ids(db, r["class_id"])
     conflicts = scheduler.check_conflict(existing, new_item)
     if conflicts:
-        return success_response({"created": False, "conflicts": conflicts, "message": "存在时间冲突"})
+        return success_response({"created": False,
+                                 "conflicts": _enrich_conflicts(db, conflicts, new_item["weekday"],
+                                                                new_item["start_time"], new_item["end_time"]),
+                                 "message": "存在时间冲突"})
     sched = ClassSchedule(
         class_id=class_id,
         weekday=new_item["weekday"],
@@ -448,7 +480,10 @@ def update_schedule(schedule_id: int, data: dict, db: Session = Depends(get_db))
     conflicts = scheduler.check_conflict(existing, new_item)
     if conflicts:
         db.rollback()
-        return success_response({"updated": False, "conflicts": conflicts, "message": "存在时间冲突"})
+        return success_response({"updated": False,
+                                 "conflicts": _enrich_conflicts(db, conflicts, new_item["weekday"],
+                                                                new_item["start_time"], new_item["end_time"]),
+                                 "message": "存在时间冲突"})
     db.commit()
     db.refresh(sched)
     return success_response({"updated": True, "schedule": _schedule_dict(db, sched)})

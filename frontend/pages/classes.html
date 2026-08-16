@@ -99,14 +99,18 @@
             <div id="term-class-info" class="hidden mb-3"></div>
             <div id="schedule-list"></div>
 
-            <!-- 空闲时段查看器（替代智能排课向导：点绿色空闲格直接为本班排课） -->
+            <!-- 空闲时段查看器（点选空闲格 → 确定排课 → 自动绑定后续课次） -->
             <div id="slot-picker" class="hidden mt-3 rounded-lg border p-4" style="border-color:#e2e8f0;background:#fafbff;">
                 <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
                     <div class="text-sm font-semibold text-gray-700">空闲时段查看</div>
                     <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1" id="slot-weekday-bar"></div>
                 </div>
-                <div class="text-xs text-gray-500 mb-2">绿色=该教室该时段空闲，点击即为本班添加这节课；灰底=该教室该时段已被占用（含学期班与班期内的寒暑假班）。</div>
+                <div class="text-xs text-gray-500 mb-2" id="slot-hint">绿色=空闲，点击选中（高亮）；再点「确定排课」落课。<span id="slot-mode-hint"></span></div>
                 <div id="slot-grid" class="overflow-x-auto"></div>
+                <div class="flex items-center gap-3 mt-3 flex-wrap">
+                    <button onclick="confirmSlot()" id="btn-confirm-slot" class="btn-primary" style="padding:6px 18px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-check"/></svg> 确定排课</button>
+                    <span class="text-xs text-gray-400" id="slot-selected-tip">请先点击选择空闲格子</span>
+                </div>
             </div>
         </div>
     </div>
@@ -362,9 +366,9 @@ function showClassModal(id) {
         };
     }
     const periodOpts = [{ v: '', label: '（请选）' }].concat(
-        [{ start: '08:00', end: '10:00' }, { start: '10:10', end: '12:10' },
-         { start: '14:00', end: '16:00' }, { start: '16:10', end: '18:10' },
-         { start: '19:00', end: '21:00' }].map(p => ({ v: `${p.start}|${p.end}`, label: `${p.start}-${p.end}` })));
+        [{ label: '上午一', start: '08:00', end: '10:00' }, { label: '上午二', start: '10:10', end: '12:10' },
+         { label: '下午三', start: '14:00', end: '16:00' }, { label: '下午四', start: '16:10', end: '18:10' }]
+         .map(p => ({ v: `${p.start}|${p.end}`, label: `${p.label} ${p.start}-${p.end}` })));
     Utils.showModal({
         title: isEdit ? '编辑班级' : '新建班级',
         subtitle: isEdit ? '修改班级信息' : '创建上课班级 · 学期跟班（每周循环）或 寒暑假班（每天固定 1 节，周日休息）',
@@ -472,14 +476,14 @@ async function removeStudent(studentId) {
 /* ---------- 课表 / 排课（教室×时段空闲查看式） ---------- */
 const WEEK_NAMES = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 const DEFAULT_PERIODS = [
-    { label: '上午①', start: '08:00', end: '10:00' },
-    { label: '上午②', start: '10:10', end: '12:10' },
-    { label: '下午①', start: '14:00', end: '16:00' },
-    { label: '下午②', start: '16:10', end: '18:10' },
-    { label: '晚自习', start: '19:00', end: '21:00' },
+    { label: '上午一', start: '08:00', end: '10:00' },
+    { label: '上午二', start: '10:10', end: '12:10' },
+    { label: '下午三', start: '14:00', end: '16:00' },
+    { label: '下午四', start: '16:10', end: '18:10' },
 ];
 let scheduleList = [];
-let slotWeekday = 5;   // 空闲时段查看默认周六（学期班默认周末上课）
+let slotWeekday = 5;      // 空闲时段查看当前星期
+let slotSelected = null;  // 当前选中格子 {weekday, start, end, classroom_id}
 
 async function loadScheduleList() {
     const box = document.getElementById('schedule-list');
@@ -508,18 +512,45 @@ async function loadScheduleList() {
     }
 }
 
+// 学期班只看周末（周六/周日）；寒暑假班看周一~周六
+function slotDays() {
+    return currentClass.term_type === 'summer_winter' ? [0, 1, 2, 3, 4, 5] : [5, 6];
+}
+
 function openSlotPicker() {
     const sp = document.getElementById('slot-picker');
     if (!sp) return;
     sp.classList.toggle('hidden');
     if (sp.classList.contains('hidden')) return;
+    slotWeekday = slotDays()[0];   // 学期班默认周六，寒暑假默认周一
+    slotSelected = null;
     renderSlotWeekdayBar();
+    renderSlotConfirmBar();
+    const hint = document.getElementById('slot-mode-hint');
+    if (hint) {
+        hint.textContent = currentClass.term_type === 'summer_winter'
+            ? '寒暑假班看周一~周六：确定后按班期每天固定 1 节、周日休息。'
+            : '学期班只看周末：确定后每周该天该时段重复上课（共上班级课次对应的周数）。';
+    }
     selectSlotWeekday(slotWeekday);
 }
 
 function renderSlotWeekdayBar() {
-    document.getElementById('slot-weekday-bar').innerHTML = WEEK_NAMES.map((n, i) => `
-        <button class="term-btn ${i === slotWeekday ? 'active' : ''}" data-wd="${i}" onclick="selectSlotWeekday(${i})" style="padding:4px 12px;font-size:12px;border-radius:6px;">${n}</button>`).join('');
+    document.getElementById('slot-weekday-bar').innerHTML = slotDays().map(wd => `
+        <button class="term-btn ${wd === slotWeekday ? 'active' : ''}" data-wd="${wd}" onclick="selectSlotWeekday(${wd})" style="padding:4px 12px;font-size:12px;border-radius:6px;">${WEEK_NAMES[wd]}</button>`).join('');
+}
+
+function renderSlotConfirmBar() {
+    const btn = document.getElementById('btn-confirm-slot');
+    const tip = document.getElementById('slot-selected-tip');
+    if (!slotSelected) {
+        if (btn) btn.disabled = true;
+        if (tip) tip.textContent = '请先点击选择空闲格子';
+        return;
+    }
+    const room = classroomList.find(c => c.id === slotSelected.classroom_id);
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    if (tip) tip.innerHTML = `已选：<b>${WEEK_NAMES[slotSelected.weekday]} ${slotSelected.start}-${slotSelected.end}</b> · ${room ? esc(room.name) : '未设教室'}，点「确定排课」${currentClass.term_type === 'summer_winter' ? '按班期每天固定上课' : '每周该时段重复上课'}。`;
 }
 
 // 未来第一个是 wd（0=周一）的日期，用于 day 接口解析该星期天的占用（学期班按周几 + 班期内寒暑假班）
@@ -537,6 +568,19 @@ function nextDateOfWeekday(wd) {
 function toMin(t) { const [h, m] = String(t || '').split(':'); return (+h || 0) * 60 + (+m || 0); }
 function overlap(a1, a2, b1, b2) { return toMin(a1) < toMin(b2) && toMin(b1) < toMin(a2); }
 
+// 排课冲突弹窗：明确显示哪一天哪节课和哪个班级冲突
+function showConflictModal(conflicts, title = '排课冲突') {
+    const list = (conflicts || []).map(c => `
+        <div class="flex items-start gap-2 py-1.5 border-b text-sm" style="border-color:#f1f5f9;">
+            <span class="badge ${c.type === 'classroom' ? 'badge--danger' : (c.type === 'teacher' ? 'badge--warning' : 'badge--neutral')} shrink-0">${c.type === 'classroom' ? '教室' : c.type === 'teacher' ? '教师' : '学生'}</span>
+            <span class="text-gray-700">${esc(c.time || '')}：${esc(c.message || '冲突')}</span>
+        </div>`).join('');
+    Utils.showModal({
+        title,
+        bodyHtml: `<div class="text-sm text-gray-600 mb-2">该排课未保存，与以下安排冲突：</div>${list || '<div class="text-sm text-gray-400">未知冲突</div>'}`,
+    });
+}
+
 async function selectSlotWeekday(wd) {
     slotWeekday = wd;
     document.querySelectorAll('#slot-weekday-bar .term-btn').forEach(b => b.classList.toggle('active', Number(b.dataset.wd) === wd));
@@ -547,36 +591,38 @@ async function selectSlotWeekday(wd) {
         const date = nextDateOfWeekday(wd);
         const [dayRes, periodRes] = await Promise.all([API.schedules.day(date), API.schedules.periods()]);
         const items = (dayRes.success && dayRes.data && dayRes.data.items) ? dayRes.data.items : [];
-        const periods = (periodRes.success && periodRes.data && periodRes.data.length) ? periodRes.data : DEFAULT_PERIODS;
+        const periodList = (periodRes.success && periodRes.data && periodRes.data.length) ? periodRes.data : DEFAULT_PERIODS;
         const rooms = classroomList.filter(c => c.status === 'active');
         if (!rooms.length) { grid.innerHTML = '<div class="text-gray-400 text-sm py-2">暂无可用教室</div>'; return; }
-        const occ = {};
-        items.forEach(it => {
-            if (!it.classroom_id) return;
-            (occ[it.classroom_id] = occ[it.classroom_id] || []).push(it);
-        });
-        const mine = (scheduleList || []).filter(s => s.weekday === wd).map(s => s.classroom_id);
+        // 本班 vs 其他班占用（本班寒暑假班期/周循环也来自 day 接口，class_id 相同）
+        const mineItems = items.filter(it => it.class_id === currentClass.id);
+        const otherItems = items.filter(it => it.class_id !== currentClass.id);
+        const hits = (list, roomId, p) => list.filter(it => it.classroom_id === roomId && overlap(it.start_time, it.end_time, p.start, p.end));
         grid.innerHTML = `
             <table class="w-full text-sm border-collapse" style="min-width:640px;">
                 <thead><tr>
-                    <th style="width:130px;text-align:left;padding:8px;" class="text-gray-400 text-xs font-medium">时段</th>
+                    <th style="width:120px;text-align:left;padding:8px;" class="text-gray-400 text-xs font-medium">节次</th>
                     ${rooms.map(r => `<th style="text-align:left;padding:8px;" class="text-gray-400 text-xs font-medium">${esc(r.name)}</th>`).join('')}
                 </tr></thead>
                 <tbody>
-                ${periods.map(p => {
-                    const takenOf = (roomId) => (occ[roomId] || []).filter(it => overlap(it.start_time, it.end_time, p.start, p.end));
+                ${periodList.map(p => {
                     return `<tr>
-                        <td style="padding:6px 8px;" class="text-xs text-gray-500 whitespace-nowrap">${esc(p.label || '')} ${p.start}-${p.end}</td>
+                        <td style="padding:6px 8px;" class="text-xs text-gray-500 whitespace-nowrap">${esc(p.label || '')}<span class="text-[10px] text-gray-400 block num">${p.start}-${p.end}</span></td>
                         ${rooms.map(r => {
-                            if (mine.includes(r.id)) {
+                            const isSel = slotSelected && slotSelected.weekday === wd && slotSelected.start === p.start && slotSelected.classroom_id === r.id;
+                            const mine = hits(mineItems, r.id, p);
+                            const taken = hits(otherItems, r.id, p);
+                            if (mine.length) {
                                 return `<td style="padding:6px 8px;"><div class="text-xs text-gray-400 bg-gray-100 rounded px-2 py-1.5 text-center">本班已有课</div></td>`;
                             }
-                            const taken = takenOf(r.id);
                             if (taken.length) {
                                 const names = [...new Set(taken.map(t => t.class_name).filter(Boolean))];
                                 return `<td style="padding:6px 8px;"><div class="text-xs text-gray-400 bg-gray-100 rounded px-2 py-1.5 text-center truncate" title="${esc(names.join('、'))}">${esc(names[0] || '已占用')}</div></td>`;
                             }
-                            return `<td style="padding:6px 8px;"><button onclick="addSlot(${wd},'${p.start}','${p.end}',${r.id})" class="w-full text-xs text-green-700 bg-green-50 hover:bg-green-100 rounded px-2 py-1.5 text-center transition">空闲</button></td>`;
+                            if (isSel) {
+                                return `<td style="padding:6px 8px;"><button data-slot="${wd}-${p.start}-${r.id}" onclick="pickSlot(${wd},'${p.start}','${p.end}',${r.id})" class="w-full text-xs text-white bg-indigo-500 hover:bg-indigo-600 rounded px-2 py-1.5 text-center transition">已选 ✓</button></td>`;
+                            }
+                            return `<td style="padding:6px 8px;"><button data-slot="${wd}-${p.start}-${r.id}" onclick="pickSlot(${wd},'${p.start}','${p.end}',${r.id})" class="w-full text-xs text-green-700 bg-green-50 hover:bg-green-100 rounded px-2 py-1.5 text-center transition">空闲</button></td>`;
                         }).join('')}
                     </tr>`;
                 }).join('')}
@@ -584,6 +630,77 @@ async function selectSlotWeekday(wd) {
             </table>`;
     } catch (e) {
         grid.innerHTML = `<div class="text-red-400 text-sm py-2">加载失败：${esc(e.message)}</div>`;
+    }
+}
+
+// 点击空闲格 → 选中（高亮），不直接落库；再点「确定排课」确认
+function pickSlot(wd, start, end, roomId) {
+    slotSelected = { weekday: wd, start, end, classroom_id: roomId };
+    renderSlotConfirmBar();
+    selectSlotWeekday(wd);
+}
+
+async function confirmSlot() {
+    if (!slotSelected) { showToast('请先点击选择空闲格子', 'info'); return; }
+    const s = slotSelected;
+    const room = classroomList.find(c => c.id === s.classroom_id);
+    if (currentClass.term_type === 'summer_winter') {
+        // 寒暑假班：确定每天固定时段+教室 → 班期（周一~周六、周日休息、共 total_lessons 天）自动确定
+        Utils.confirmDialog({
+            title: '确定寒暑假班上课安排',
+            message: `确定 <b>${WEEK_NAMES[s.weekday]} 起每天 ${s.start}-${s.end}</b>（${room ? esc(room.name) : '未设教室'}）？将按班期（周一~周六、周日休息、共 ${currentClass.total_lessons} 天）每天固定上课。`,
+            onOk: async () => {
+                try {
+                    const r = await API.classes.update(currentClass.id, {
+                        daily_start: s.start, daily_end: s.end, classroom_id: s.classroom_id,
+                    });
+                    if (r.success) {
+                        showToast('寒暑假班上课安排已更新，班期自动确定', 'success');
+                        currentClass = r.data;
+                        slotSelected = null;
+                        loadClassDetail();
+                    } else {
+                        showToast('保存失败：' + (r.error || ''), 'error');
+                    }
+                } catch (e) {
+                    // 400 冲突：detail 可能是 {message, conflicts}
+                    const d = (e && e.message && typeof e.message === 'object') ? e.message : null;
+                    if (d && d.conflicts) {
+                        const mapped = (d.conflicts || []).map(c => ({ type: c.type, time: c.date || '', message: c.message }));
+                        showConflictModal(mapped, '班期冲突');
+                    } else {
+                        showToast('保存失败：' + (d && d.message ? d.message : e.message), 'error');
+                    }
+                }
+            },
+        });
+    } else {
+        // 学期跟班：每周该天该时段重复上课，自动绑定后续周次（共上班级课次对应周数）
+        Utils.confirmDialog({
+            title: '确定每周固定上课',
+            message: `确定 <b>每周${WEEK_NAMES[s.weekday]} ${s.start}-${s.end}</b>（${room ? esc(room.name) : '未设教室'}）上课？将每周该时段重复（学期班），后续周次自动绑定。`,
+            onOk: async () => {
+                try {
+                    const r = await API.schedules.add({
+                        class_id: currentClass.id,
+                        weekday: s.weekday, start_time: s.start, end_time: s.end,
+                        classroom_id: s.classroom_id,
+                        teacher_id: currentClass.teacher_id || null,
+                    });
+                    if (r.success && r.data.created) {
+                        showToast('已添加：每周' + WEEK_NAMES[s.weekday] + ' ' + s.start + '-' + s.end + ' 上课', 'success');
+                        slotSelected = null;
+                        renderSlotConfirmBar();
+                        await loadScheduleList();
+                        selectSlotWeekday(s.weekday);
+                    } else {
+                        const c = (r.data && r.data.conflicts) || [];
+                        if (c.length) showConflictModal(c);
+                        else showToast('添加失败：' + ((r.data && r.data.message) || ''), 'error');
+                    }
+                } catch (e) { showToast('添加失败：' + e.message, 'error'); }
+            },
+        });
     }
 }
 
@@ -606,7 +723,8 @@ async function addSlot(weekday, start, end, roomId) {
                     selectSlotWeekday(weekday);   // 刷新空闲网格
                 } else {
                     const c = (r.data && r.data.conflicts) || [];
-                    showToast(c.length ? '冲突：' + c[0].message : '添加失败', 'error');
+                    if (c.length) showConflictModal(c);
+                    else showToast('添加失败：' + ((r.data && r.data.message) || ''), 'error');
                 }
             } catch (e) { showToast('添加失败：' + e.message, 'error'); }
         },
@@ -614,27 +732,21 @@ async function addSlot(weekday, start, end, roomId) {
 }
 
 async function showManualScheduleModal() {
-    let periods = [{ label: '上午①', start: '08:00', end: '10:00' }];
-    try {
-        const r = await API.schedules.periods();
-        if (r.success && r.data && r.data.length) periods = r.data;
-    } catch (e) { /* 用默认时段 */ }
     Utils.showModal({
         title: '手动加课',
-        subtitle: '为该班添加一次每周固定课次（自动检测教师/教室/学生冲突）',
+        subtitle: '为该班添加一次每周固定课次，具体时间可自定义（自动检测教师/教室/学生冲突）',
         width: 520,
         columns: 2,
         fields: [
             { key: 'weekday', label: '星期', type: 'select', options: WEEK_NAMES.map((n, i) => ({ v: i, label: n })), section: '时间' },
-            { key: 'period', label: '时段', type: 'select', options: periods.map(p => ({ v: `${p.start}|${p.end}`, label: `${p.label || ''} ${p.start}-${p.end}` })), section: '时间' },
+            { key: 'start_time', label: '开始时间', type: 'time', default: '08:00', section: '时间' },
+            { key: 'end_time', label: '结束时间', type: 'time', default: '10:00', section: '时间' },
             { key: 'classroom_id', label: '教室', type: 'select', options: [{ v: '', label: '（不指定）' }].concat(classroomList.filter(c => c.status === 'active').map(c => ({ v: c.id, label: c.name }))), section: '资源' },
             { key: 'teacher_id', label: '教师', type: 'select', options: [{ v: '', label: '（不指定）' }].concat(teacherList.map(t => ({ v: t.id, label: t.name }))), section: '资源' },
         ],
         onSubmit: async (data) => {
-            const [start, end] = String(data.period || '|').split('|');
+            if (!data.start_time || !data.end_time) { showToast('请填写开始/结束时间', 'error'); return; }
             data.class_id = currentClass.id;
-            data.start_time = start;
-            data.end_time = end;
             data.classroom_id = data.classroom_id ? Number(data.classroom_id) : null;
             data.teacher_id = data.teacher_id ? Number(data.teacher_id) : null;
             try {
@@ -644,7 +756,8 @@ async function showManualScheduleModal() {
                     loadScheduleList();
                 } else {
                     const c = (r.data && r.data.conflicts) || [];
-                    showToast(c.length ? '冲突：' + c[0].message : '添加失败', 'error');
+                    if (c.length) showConflictModal(c);
+                    else showToast('添加失败：' + ((r.data && r.data.message) || ''), 'error');
                 }
             } catch (e) { showToast('添加失败：' + e.message, 'error'); }
         },
@@ -698,11 +811,24 @@ loadBaseData();
 if (classId) { loadClassDetail(); } else { loadClasses(); }
 window.currentPageRefresh = classId ? loadClassDetail : loadClasses;
 
+// 修 bug：/classes/4 → /classes/5 是同一路由记录，组件不重挂载，脚本不会重跑。
+// 监听 hashchange，classId 变化时整页重载以加载新班级。
+function onClassHashChange() {
+    const parts = location.hash.split('/');
+    const newId = parts[2] ? parseInt(parts[2]) : null;
+    if (newId !== classId) location.reload();
+}
+window.addEventListener('hashchange', onClassHashChange);
+window.__pageUnmounted = function () {
+    window.removeEventListener('hashchange', onClassHashChange);
+    window.__pageUnmounted = null;
+};
+
 Object.assign(window, {
     loadClasses, setTermFilter, openClassDetail, showClassModal, showAddStudentModal,
     removeStudent, toggleClassStatus, deleteClass,
-    loadScheduleList, openSlotPicker, selectSlotWeekday, addSlot,
-    showManualScheduleModal, deleteSchedule, showExtendModal,
+    loadScheduleList, openSlotPicker, selectSlotWeekday, pickSlot, confirmSlot,
+    showManualScheduleModal, deleteSchedule, showExtendModal, showConflictModal,
 });
 })();
 </script>

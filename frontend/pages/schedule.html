@@ -87,60 +87,63 @@ async function loadDaySchedule() {
             grid.innerHTML = '<div class="text-center py-10 text-gray-400 text-sm">请先在「设置 → 教室管理」添加教室（时段为系统默认节次）</div>';
             return;
         }
-        if (!items.length) {
-            grid.innerHTML = `<div class="text-center py-12">
-                <div class="empty-icon mx-auto mb-3"><svg class="icon"><use href="#icon-calendar"/></svg></div>
-                <div class="empty-title">当天暂无排课</div>
-                <div class="empty-desc">${date} 没有已确认的上课安排</div>
-            </div>`;
-            return;
-        }
-
+        // 始终渲染网格（含空教室），保证当天也能看到完整课表结构
         renderGrid(items);
     } catch (e) {
         grid.innerHTML = `<div class="text-red-400 text-sm py-8 text-center">加载失败：${esc(e.message)}</div>`;
     }
 }
 
-/* ---------- 渲染 教室×时段 网格 ---------- */
+/* ---------- 渲染 教室×节次 网格（一屏显示：左列节次编号，具体时间在课程卡内） ---------- */
+function toMin(t) { const [h, m] = String(t || '').split(':'); return (+h || 0) * 60 + (+m || 0); }
+
+// 根据课程开始时间归入对应节次行（如 10:40 → 上午二）
+function periodIndexFor(start) {
+    const s = toMin(start);
+    for (let i = 0; i < periods.length; i++) {
+        const p = periods[i];
+        if (s >= toMin(p.start) && s < toMin(p.end)) return i;
+    }
+    for (let i = periods.length - 1; i >= 0; i--) {
+        if (s >= toMin(periods[i].start)) return i;
+    }
+    return 0;
+}
+
 function renderGrid(items) {
     const grid = document.getElementById('sched-grid');
-    // 列：时间 + 各教室 + 未指定教室
     const cols = [{ id: null, name: '未指定教室' }].concat(rooms);
-    let html = '<table class="w-full text-sm" style="border-collapse:separate;border-spacing:0;min-width:800px;">';
+    let html = '<table class="w-full text-sm" style="table-layout:fixed;border-collapse:separate;border-spacing:0;">';
     // 表头
     html += '<thead><tr>';
-    html += `<th style="background:#fb923c;color:#fff;padding:8px 10px;font-weight:600;min-width:130px;position:sticky;left:0;">时间</th>`;
+    html += `<th style="background:#4f46e5;color:#fff;padding:8px 6px;font-weight:600;width:92px;">节次</th>`;
     cols.forEach(c => {
-        html += `<th style="background:#fb923c;color:#fff;padding:8px 10px;font-weight:600;min-width:140px;">${esc(c.name)}</th>`;
+        html += `<th style="background:#4f46e5;color:#fff;padding:8px 6px;font-weight:600;">${esc(c.name)}</th>`;
     });
     html += '</tr></thead><tbody>';
 
-    // 行：每个时段
+    // 行：每个节次（编号 + 参考时间小字）
     periods.forEach((p, i) => {
         const odd = i % 2 === 1;
         html += `<tr>`;
-        // 时间列（绿色）
-        html += `<td style="background:${odd ? '#e8f5e9' : '#f0faf0'};padding:8px 10px;font-weight:600;color:#2f855a;position:sticky;left:0;border-bottom:1px solid #e2e8f0;">
-            <div class="text-xs">${esc(p.label || ('第' + (i + 1) + '节'))}</div>
-            <div class="text-xs text-gray-600 num mt-0.5">${esc(p.start)}-${esc(p.end)}</div>
+        html += `<td style="background:${odd ? '#eef2ff' : '#f5f7ff'};padding:6px;text-align:center;vertical-align:middle;border-bottom:1px solid #e2e8f0;">
+            <div class="text-sm font-semibold" style="color:#4f46e5;">${esc(p.label || ('第' + (i + 1) + '节'))}</div>
+            <div class="text-[10px] text-gray-400 num mt-0.5">${esc(p.start)}-${esc(p.end)}</div>
         </td>`;
         cols.forEach(c => {
-            const cellItems = items.filter(it => it.start_time === p.start && (it.classroom_id || null) === c.id);
-            html += `<td style="border-bottom:1px solid #e2e8f0;border-left:1px solid #f1f5f9;padding:6px 8px;vertical-align:top;min-height:56px;">`;
-            if (cellItems.length) {
-                cellItems.forEach(it => {
-                    const isTerm = it.term_type === 'summer_winter';
-                    const st = isTerm ? 'background:#fdf2f8;border-color:#fbcfe8;' : 'background:#eef2ff;border-color:#c7d2fe;';
-                    const students = (it.students || []).map(s => s.name).join(' ');
-                    html += `<div class="rounded-md border px-2 py-1.5 mb-1" style="${st}">
-                        <div class="text-xs font-semibold text-gray-800">${esc(it.class_name)}${isTerm ? ' <span class="badge badge--warning" style="font-size:10px;padding:0 4px;">暑假</span>' : ''}</div>
-                        ${it.start_time !== it.end_time && it.end_time !== p.end ? `<div class="text-[11px] text-gray-500 num">${esc(it.start_time)}-${esc(it.end_time)}</div>` : ''}
-                        <div class="text-[11px] text-gray-500">👨‍🏫 ${esc(it.teacher_name || '未指派')}</div>
-                        ${students ? `<div class="text-[11px] text-gray-400 truncate" title="${esc(students)}">👥 ${esc(students)}</div>` : ''}
-                    </div>`;
-                });
-            }
+            const cellItems = items.filter(it => periodIndexFor(it.start_time) === i && (it.classroom_id || null) === c.id);
+            html += `<td style="border-bottom:1px solid #e2e8f0;border-left:1px solid #f1f5f9;padding:4px;vertical-align:top;">`;
+            cellItems.forEach(it => {
+                const isTerm = it.term_type === 'summer_winter';
+                const st = isTerm ? 'background:#fdf2f8;border-color:#fbcfe8;' : 'background:#eef2ff;border-color:#c7d2fe;';
+                const students = (it.students || []).map(s => s.name).join(' ');
+                html += `<div class="rounded-md border px-1.5 py-1 mb-1" style="${st}">
+                    <div class="text-[11px] font-semibold text-gray-800 leading-tight">${esc(it.class_name)}${isTerm ? ' <span class="badge badge--warning" style="font-size:9px;padding:0 3px;">暑假</span>' : ''}</div>
+                    <div class="text-[10px] font-medium num" style="color:#dc2626;">${esc(it.start_time)}-${esc(it.end_time)}</div>
+                    <div class="text-[10px] text-gray-500 truncate">👨‍🏫 ${esc(it.teacher_name || '未指派')}</div>
+                    ${students ? `<div class="text-[10px] text-gray-400 truncate" title="${esc(students)}">👥 ${esc(students)}</div>` : ''}
+                </div>`;
+            });
             html += `</td>`;
         });
         html += '</tr>';

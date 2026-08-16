@@ -182,16 +182,17 @@ for cid, members in CLASS_MEMBERS.items():
 db.flush()
 
 # ---- 已确认课次（学期班 active 周循环） ----
-# (class, weekday(0=周一), start, end, room)
+# 机构白天上课（上午一/二、下午三/四），晚上不上课；学期班默认周末白天上课。
+# 避开寒暑假班白天占用：数学班14:00/4号、物理班16:10/5号、小升初英语08:00/VIP3。
 def mk_sched(c, weekday, start, end, room):
     db.add(ClassSchedule(class_id=c.id, weekday=weekday, start_time=start, end_time=end,
                          classroom_id=room_ids[room], teacher_id=c.teacher_id, status="active"))
-mk_sched(c_math2, 0, "18:00", "20:00", "4号课堂")   # 周一
-mk_sched(c_math2, 2, "18:00", "20:00", "4号课堂")   # 周三
-mk_sched(c_gao3_1v1, 1, "19:00", "21:00", "VIP2")   # 周二
-mk_sched(c_gao3_1v1, 5, "10:00", "12:00", "VIP2")   # 周六
-mk_sched(c_phy1, 0, "20:00", "22:00", "5号课堂")    # 周一
-mk_sched(c_phy1, 4, "20:00", "22:00", "5号课堂")    # 周五
+mk_sched(c_math2, 5, "10:10", "12:10", "4号课堂")   # 周六 上午二
+mk_sched(c_math2, 6, "10:10", "12:10", "4号课堂")   # 周日 上午二
+mk_sched(c_gao3_1v1, 5, "14:00", "16:00", "VIP2")   # 周六 下午三
+mk_sched(c_gao3_1v1, 6, "14:00", "16:00", "VIP2")   # 周日 下午三
+mk_sched(c_phy1, 5, "08:00", "10:00", "5号课堂")    # 周六 上午一
+mk_sched(c_phy1, 6, "08:00", "10:00", "5号课堂")    # 周日 上午一
 # c_eng2 高二英语冲刺班：无课次 → 工作台「待排课」演示
 
 # ---- 成绩 / 报告 / 课程规划 / 沟通日志 ----
@@ -359,13 +360,12 @@ for act in [
 ]:
     db.add(ActivityLog(action=act[0], detail=act[1], student_id=act[2], subject_id=act[3]))
 
-# ---- 节次模板（保证智能排课可用，默认 5 时段）----
+# ---- 节次模板（机构白天上课：上午一二节 + 下午三四节）----
 periods = [
-    {"label": "上午①", "start": "08:00", "end": "10:00"},
-    {"label": "上午②", "start": "10:10", "end": "12:10"},
-    {"label": "下午①", "start": "14:00", "end": "16:00"},
-    {"label": "下午②", "start": "16:10", "end": "18:10"},
-    {"label": "晚自习", "start": "19:00", "end": "21:00"},
+    {"label": "上午一", "start": "08:00", "end": "10:00"},
+    {"label": "上午二", "start": "10:10", "end": "12:10"},
+    {"label": "下午三", "start": "14:00", "end": "16:00"},
+    {"label": "下午四", "start": "16:10", "end": "18:10"},
 ]
 row = db.query(Setting).filter(Setting.key == "class_periods").first()
 if not row:
