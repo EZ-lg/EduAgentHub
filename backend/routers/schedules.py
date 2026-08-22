@@ -37,6 +37,23 @@ router = APIRouter(prefix="/api/schedules", tags=["schedules"])
 WEEKDAY_CN = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
 
+def _to_min(t: str) -> int:
+    """HH:MM → 分钟（时间区间校验用）"""
+    try:
+        h, m = str(t).split(":")
+        return int(h) * 60 + int(m)
+    except (ValueError, AttributeError):
+        return 0
+
+
+def _validate_time_range(start: str, end: str):
+    """校验时间格式与区间：end 必须晚于 start（防倒置区间绕过冲突检测）"""
+    if not start or not end:
+        raise HTTPException(status_code=400, detail="请填写开始与结束时间")
+    if _to_min(end) <= _to_min(start):
+        raise HTTPException(status_code=400, detail="结束时间需晚于开始时间")
+
+
 def _enrich_conflicts(db, conflicts, weekday=None, start=None, end=None):
     """给冲突列表补全信息：冲突班级名 + 具体时间，让前端明确提示「哪一天哪节课和哪个班冲突」"""
     out = []
@@ -261,11 +278,22 @@ def day_schedule(date: str, db: Session = Depends(get_db)):
     weekday = d.weekday()
     items = []
 
-    # a) 学期班周循环课
+    # a) 周循环课（date 为空）：按 weekday 每周重复
     rows = db.query(ClassSchedule).filter(
-        ClassSchedule.status == "active", ClassSchedule.weekday == weekday).all()
+        ClassSchedule.status == "active", ClassSchedule.weekday == weekday,
+        ClassSchedule.date == "").all()
     for r in rows:
-        items.append(_schedule_dict(db, r))
+        item = _schedule_dict(db, r)
+        item["is_adhoc"] = False
+        items.append(item)
+
+    # a2) 临时调课（date 精确匹配当天，一天可多节，计入总课时流程）
+    adhoc = db.query(ClassSchedule).filter(
+        ClassSchedule.status == "active", ClassSchedule.date == date).all()
+    for r in adhoc:
+        item = _schedule_dict(db, r)
+        item["is_adhoc"] = True
+        items.append(item)
 
     # b) 寒暑假班每天固定课（周日休息）
     if weekday != 6:
@@ -288,10 +316,10 @@ def day_schedule(date: str, db: Session = Depends(get_db)):
                 "classroom_id": t.classroom_id, "classroom_name": room.name if room else "",
                 "teacher_id": t.teacher_id, "teacher_name": teacher.name if teacher else "",
                 "students": [{"id": s.id, "name": s.name} for _, s in rows_s],
-                "status": "active", "term_type": "summer_winter",
+                "status": "active", "term_type": "summer_winter", "is_adhoc": False,
             })
 
-    items.sort(key=lambda x: x.get("start_time", ""))
+    items.sort(key=lambda x: (x.get("start_time", ""), 0 if x.get("is_adhoc") else 1))
     return success_response({"date": date, "weekday": weekday, "items": items})
 
 
@@ -428,6 +456,65 @@ def check_conflicts(data: dict, db: Session = Depends(get_db)):
     return success_response({"conflicts": _enrich_conflicts(db, conflicts)})
 
 
+@router.post("/ad-hoc")
+def add_ad_hoc_schedule(data: dict, db: Session = Depends(get_db)):
+    """临时调课：为指定班级在指定日期加一节课（一天可多节，计入总课时流程）
+
+    body: {class_id, date, start_time, end_time, classroom_id, teacher_id}
+    仅在该日期生效一次（date 写入 class_schedules），冲突校验覆盖该时段所有已确认课次。
+    """
+    class_id = data.get("class_id")
+    date = (data.get("date") or "").strip()
+    start_time = (data.get("start_time") or "").strip()
+    end_time = (data.get("end_time") or "").strip()
+    if not class_id or not date:
+        raise HTTPException(status_code=400, detail="请选择班级和日期")
+    try:
+        d = datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="日期格式应为 YYYY-MM-DD")
+    _validate_time_range(start_time, end_time)
+    cls = db.query(Class).filter(Class.id == class_id).first()
+    if not cls:
+        raise HTTPException(status_code=404, detail="班级不存在")
+    weekday = d.weekday()
+
+    new_item = {
+        "class_id": class_id,
+        "weekday": weekday,
+        "start_time": start_time,
+        "end_time": end_time,
+        "classroom_id": data.get("classroom_id"),
+        "teacher_id": data.get("teacher_id"),
+        "student_ids": _class_student_ids(db, class_id),
+    }
+    # 冲突检测：所有 active 课次（周循环 + 其他临时课，含本班已有课次，防同班同时段双排）
+    existing = [r.to_dict() for r in db.query(ClassSchedule).filter(ClassSchedule.status == "active").all()]
+    for r in existing:
+        r["student_ids"] = _class_student_ids(db, r["class_id"])
+    conflicts = scheduler.check_conflict(existing, new_item)
+    if conflicts:
+        return success_response({"created": False,
+                                 "conflicts": _enrich_conflicts(db, conflicts, weekday, start_time, end_time),
+                                 "message": "该时段存在冲突，请调整后再试"})
+
+    sched = ClassSchedule(
+        class_id=class_id,
+        weekday=weekday,
+        start_time=start_time,
+        end_time=end_time,
+        date=date,
+        classroom_id=data.get("classroom_id"),
+        teacher_id=data.get("teacher_id"),
+        status="active",
+    )
+    db.add(sched)
+    log_activity(db, "临时调课", f"班级「{cls.name}」{date} {start_time}-{end_time}")
+    db.commit()
+    db.refresh(sched)
+    return success_response({"created": True, "schedule": _schedule_dict(db, sched)})
+
+
 @router.post("")
 def add_schedule(data: dict, db: Session = Depends(get_db)):
     """手动新增课次（带冲突校验，冲突则 400 拒绝）"""
@@ -437,6 +524,7 @@ def add_schedule(data: dict, db: Session = Depends(get_db)):
     cls = db.query(Class).filter(Class.id == class_id).first()
     if not cls:
         raise HTTPException(status_code=404, detail="班级不存在")
+    _validate_time_range(data.get("start_time", ""), data.get("end_time", ""))
     new_item = {
         "class_id": class_id,
         "weekday": int(data.get("weekday", 0)),
@@ -482,6 +570,8 @@ def update_schedule(schedule_id: int, data: dict, db: Session = Depends(get_db))
     for f in ["start_time", "end_time", "classroom_id", "teacher_id"]:
         if f in data:
             setattr(sched, f, data[f])
+    if "start_time" in data or "end_time" in data:
+        _validate_time_range(sched.start_time, sched.end_time)
     db.flush()
     new_item = sched.to_dict()
     new_item["student_ids"] = _class_student_ids(db, sched.class_id)

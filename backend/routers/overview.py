@@ -214,9 +214,11 @@ def _class_summary(db: Session, cls: Class) -> dict:
 def _today_classes(db: Session, today: date, wd: int) -> list:
     """今天有课的班级（混合解析，与课表 /api/schedules/day 口径一致）"""
     result = []
-    # 学期班：active 课次 weekday 匹配
+    today_str = today.isoformat()
+    # 周循环课（date 为空）：active 课次 weekday 匹配
     rows = db.query(ClassSchedule, Class).join(Class, ClassSchedule.class_id == Class.id).filter(
-        ClassSchedule.status == "active", ClassSchedule.weekday == wd).all()
+        ClassSchedule.status == "active", ClassSchedule.weekday == wd,
+        ClassSchedule.date == "").all()
     seen = set()
     for sched, cls in rows:
         seen.add(cls.id)
@@ -224,6 +226,18 @@ def _today_classes(db: Session, today: date, wd: int) -> list:
         item["start_time"] = sched.start_time
         item["end_time"] = sched.end_time
         item["weekday"] = wd
+        item["is_adhoc"] = False
+        result.append(item)
+    # 临时调课：date 精确匹配今天
+    adhoc_rows = db.query(ClassSchedule, Class).join(Class, ClassSchedule.class_id == Class.id).filter(
+        ClassSchedule.status == "active", ClassSchedule.date == today_str).all()
+    for sched, cls in adhoc_rows:
+        seen.add(cls.id)
+        item = _class_summary(db, cls)
+        item["start_time"] = sched.start_time
+        item["end_time"] = sched.end_time
+        item["weekday"] = wd
+        item["is_adhoc"] = True
         result.append(item)
     # 寒暑假班：班期内且非周日
     if wd != 6:
@@ -270,7 +284,7 @@ def _recent_activities(db: Session, limit: int = 10) -> list:
 
 # ---------------------------------------------------------------- 学生总览
 def _linked_class(db: Session, student_id: int, subject: Subject):
-    """找该生某学科对应的上课班级（优先一对一 subject_id 绑定，其次 1vN 同名学科匹配）"""
+    """找该生某学科对应的上课班级（优先一对1 的 subject_id 绑定，其次同名学科匹配）"""
     cs = db.query(ClassStudent).filter(
         ClassStudent.student_id == student_id,
         ClassStudent.subject_id == subject.id,

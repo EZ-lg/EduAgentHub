@@ -156,6 +156,7 @@ window.API = {
         confirm(data) { return API.post('/api/schedules/confirm', data); },
         check(data) { return API.post('/api/schedules/check', data); },
         add(data) { return API.post('/api/schedules', data); },
+        adHoc(data) { return API.post('/api/schedules/ad-hoc', data); },  // 临时调课（指定日期加一节课）
         update(id, data) { return API.put(`/api/schedules/${id}`, data); },
         delete(id) { return API.delete(`/api/schedules/${id}`); },
     },

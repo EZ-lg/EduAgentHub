@@ -33,6 +33,12 @@ MIGRATION_RULES = {
             "daily_end": "VARCHAR DEFAULT ''",
         }
     },
+    "class_schedules": {
+        "cols": {
+            # 临时调课：date 非空表示仅该日期生效一次；空 = 每周循环课
+            "date": "VARCHAR DEFAULT ''",
+        }
+    },
 }
 
 

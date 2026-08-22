@@ -22,6 +22,8 @@
 import random
 from typing import List, Dict, Optional
 
+from backend.models.class_ import class_pair_count
+
 
 def _to_min(t: str) -> int:
     """HH:MM → 分钟（用于区间判断）"""
@@ -147,9 +149,9 @@ def auto_plan(classes: List[dict], active_schedules: List[dict], period_slots: L
     """
     occupied = [s for s in active_schedules if s.get("status") in ("active", None)]
 
-    # 班级优先级：1v1 > 1vN；每周次数多 > 少；人数多 > 少
+    # 班级优先级：一对1（1v1）> 一对N/旧小班；每周次数多 > 少；人数多 > 少
     def _priority(cls):
-        return (0 if cls.get("class_type") == "1v1" else 1,
+        return (0 if class_pair_count(cls.get("class_type")) == 1 else 1,
                 -cls.get("weekly_frequency", 1),
                 -(len(cls.get("student_ids") or [])))
 

@@ -143,23 +143,23 @@ def mk_class(name, subject_name, teacher, room, ctype="1vN", term="semester", fr
     db.flush()
     return c
 
-# 学期班
-c_math2 = mk_class("初二数学冲刺班", "数学", t_zhang, "4号课堂", notes="每周两次，冲刺期末")
+# 学期班（班型一对几，教务按班容量填写）
+c_math2 = mk_class("初二数学冲刺班", "数学", t_zhang, "4号课堂", ctype="1v3", notes="每周两次，冲刺期末")
 c_gao3_1v1 = mk_class("高三数学一对一", "数学", t_wang, "VIP2", ctype="1v1", notes="一对一拔高，目标 130+")
-c_phy1 = mk_class("高一物理班", "物理", t_liuyang, "5号课堂", notes="力学专项")
-c_eng2 = mk_class("高二英语冲刺班", "英语", t_li, "VIP3", notes="【待排课】语法+完形专项")
+c_phy1 = mk_class("高一物理班", "物理", t_liuyang, "5号课堂", ctype="1v2", notes="力学专项")
+c_eng2 = mk_class("高二英语冲刺班", "英语", t_li, "VIP3", ctype="1v2", notes="【待排课】语法+完形专项")
 # 寒暑假班
-c_sum_math = mk_class("新初三数学班", "数学", t_zhang, "4号课堂", term="summer_winter",
+c_sum_math = mk_class("新初三数学班", "数学", t_zhang, "4号课堂", ctype="1v3", term="summer_winter",
                       total=40, d_start="14:00", d_end="16:00", start="2026-07-15",
                       end=compute_end_date("2026-07-15", 40), notes="暑假集中冲刺，周日休息")
-c_sum_phy = mk_class("新高二物理班", "物理", t_liuyang, "5号课堂", term="summer_winter",
+c_sum_phy = mk_class("新高二物理班", "物理", t_liuyang, "5号课堂", ctype="1v2", term="summer_winter",
                      total=12, d_start="16:10", d_end="18:10", start="2026-08-03",
                      end=compute_end_date("2026-08-03", 12), notes="假期预科")
-c_sum_eng = mk_class("小升初英语班", "英语", t_li, "VIP3", term="summer_winter",
+c_sum_eng = mk_class("小升初英语班", "英语", t_li, "VIP3", ctype="1v2", term="summer_winter",
                      total=10, d_start="08:00", d_end="10:00", start="2026-08-10",
                      end=compute_end_date("2026-08-10", 10), notes="音标+基础语法")
 # 冲突占位班：新初三数学班 8/29 结束后 8/30 起，同一教室 4号课堂 同一时段 14:00 → 续课数学班必撞
-c_sum_yuwen = mk_class("新高一语文班", "语文", t_chen, "4号课堂", term="summer_winter",
+c_sum_yuwen = mk_class("新高一语文班", "语文", t_chen, "4号课堂", ctype="1v2", term="summer_winter",
                        total=10, d_start="14:00", d_end="16:00", start="2026-08-30",
                        end=compute_end_date("2026-08-30", 10), notes="预科阅读写作")
 

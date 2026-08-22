@@ -80,7 +80,8 @@ window.Utils = {
     /**
      * 年级选项（小学/初中/高中）
      */
-    grades: ['小一', '小二', '小三', '小四', '小五', '小六', '初一', '初二', '初三', '高一', '高二', '高三'],
+    // 年级选项：统一为数据库实际存储的写法（六年级，而非小六），保证编辑时 select 能匹配预填
+    grades: ['小一', '小二', '小三', '小四', '小五', '六年级', '初一', '初二', '初三', '高一', '高二', '高三'],
 
     /**
      * 通用表单弹窗
@@ -139,7 +140,16 @@ window.Utils = {
                     const sel = String(ov) === String(val) ? 'selected' : '';
                     return `<option value="${Utils.escapeHtml(String(ov))}" ${sel}>${Utils.escapeHtml(String(ol))}</option>`;
                 }).join('');
-                input = `<select class="w-full" data-key="${f.key}">${opts}</select>`;
+                // 若当前值不在预置选项中（如旧数据「六年级/新高一」与预设不一致），
+                // 补一个承载原值的选项，避免编辑时显示空白/保存时丢值（需求3）
+                const hasMatch = (f.options || []).some(o => {
+                    const ov = (typeof o === 'object') ? (o.v !== undefined ? o.v : o.value) : o;
+                    return String(ov) === String(val);
+                });
+                const extra = (!hasMatch && val !== '' && val !== null && val !== undefined)
+                    ? `<option value="${Utils.escapeHtml(String(val))}" selected>${Utils.escapeHtml(String(val))}</option>`
+                    : '';
+                input = `<select class="w-full" data-key="${f.key}">${extra}${opts}</select>`;
             } else if (f.type === 'multi-select') {
                 const cur = Array.isArray(val) ? val.map(String) : [];
                 const opts = (f.options || []).map(o => {
@@ -168,7 +178,9 @@ window.Utils = {
             let fieldHtml = '', lastSection = '';
             for (const f of fields) {
                 if (!fieldVisible(f)) continue;
-                const val = (vals[f.key] !== undefined && vals[f.key] !== null) ? vals[f.key] : (f.default || '');
+                // 首屏渲染时 DOM 尚无字段，collectValues() 为空 → 必须回退到 initial（values 预填值）。
+                // 之前误用 f.default，导致编辑弹窗打开时预填值被丢弃，用户需重新填写（需求3）。
+                const val = (vals[f.key] !== undefined && vals[f.key] !== null) ? vals[f.key] : initial[f.key];
                 if (f.section && f.section !== lastSection) {
                     fieldHtml += `<div class="col-span-2 pt-2 mb-1 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b" style="border-color:#f1f5f9;">${Utils.escapeHtml(f.section)}</div>`;
                     lastSection = f.section;

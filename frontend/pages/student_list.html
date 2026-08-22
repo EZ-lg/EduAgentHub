@@ -132,9 +132,38 @@ function showCreateStudentModal() {
         onSubmit: async (data) => {
             try {
                 const r = await API.students.create(data);
-                if (r.success) { showToast('学生创建成功', 'success'); loadStudents(); }
+                if (r.success) {
+                    showToast('学生创建成功', 'success');
+                    loadStudents();
+                    // 新建学生后紧接着弹「新建学科」，保证每名学生至少一个学科
+                    showCreateSubjectModal(r.data);
+                }
                 else showToast('创建失败：' + (r.error || '未知错误'), 'error');
             } catch (e) { showToast('创建失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+/* ---------- 新建学科（紧随新建学生弹出） ---------- */
+function showCreateSubjectModal(student) {
+    if (!student || !student.id) return;
+    Utils.showModal({
+        title: '新建学科',
+        subtitle: `为「${student.name || ''}」新建第一个学科（每名学生至少一个学科，可稍后在学生详情继续添加）`,
+        width: 420,
+        fields: [
+            { key: 'name', label: '学科', type: 'select', options: Utils.subjectPresets.map(s => ({ v: s, label: s })), required: true },
+        ],
+        onSubmit: async (data) => {
+            try {
+                const r = await API.subjects.create({ student_id: student.id, name: data.name });
+                if (r.success) {
+                    showToast(`已为「${student.name}」新建「${r.data.name}」学科`, 'success');
+                    // 需求4：选择学科后自动进入该学科的「AI 对话采集」，采集完成后可生成学情报告
+                    setTimeout(() => { location.hash = '#/conversation/' + r.data.id; }, 300);
+                }
+                else showToast('学科创建失败：' + (r.error || '未知错误'), 'error');
+            } catch (e) { showToast('学科创建失败：' + e.message, 'error'); }
         },
     });
 }

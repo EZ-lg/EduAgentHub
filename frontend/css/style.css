@@ -526,29 +526,31 @@ input:focus, select:focus, textarea:focus {
 }
 #pdf-meta span { margin: 0 6px; }
 
-/* 报告方法总纲/写在最后（与章节卡协调的 callout：白卡 + 红色左边条 + 醒目标题） */
+/* 报告方法总纲/写在最后（紧凑红色 callout：淡红底 + 红色左边条 + 大字正文）
+   注意：white-space: pre-wrap 只能放正文上 —— 放容器上会把模板缩进换行
+   保留成大量空白行盒，导致红框被撑高（实测 318px vs 内容仅需 ~140px） */
 .report-callout {
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: linear-gradient(135deg, #fdf3f3, #fff8f6);
+    border: 1px solid #f5dcdb;
     border-left: 4px solid #c0392b;
-    padding: 20px;
+    padding: 10px 14px;
     border-radius: 8px;
     margin-bottom: 12px;
-    line-height: 1.75;
-    white-space: pre-wrap;
+    line-height: 1.8;
 }
 .report-callout .callout-title {
     color: #c0392b;
-    font-weight: 600;
-    font-size: 14px;
+    font-weight: 700;
+    font-size: 15px;
     display: flex;
     align-items: center;
 }
 .report-callout .callout-body {
-    color: #374151;
-    font-size: 15px;
+    color: #4b3d3d;
+    font-size: 16px;
     font-weight: 400;
-    margin-top: 8px;
+    margin-top: 4px;
+    white-space: pre-wrap;
 }
 .report-subtitle {
     color: #555555; font-size: 14px; text-align: center;
@@ -556,6 +558,10 @@ input:focus, select:focus, textarea:focus {
 }
 
 /* ========== 图表容器 ========== */
+/* 课表课程卡：可点击进入班级管理，hover 提升交互提示 */
+.sched-card { transition: transform .1s ease, box-shadow .1s ease, border-color .1s ease; }
+.sched-card:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(108,92,231,.15); border-color: #c4b5fd !important; }
+
 .chart-container {
     width: 100%;
     height: 400px;

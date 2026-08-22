@@ -5,13 +5,29 @@
 - 学习维度（subjects）：学生"学什么"的记录仓库，报告/规划/成绩/日志挂这里（1.0）
 - 上课维度（classes）：机构"怎么上课"的排课单元（2.0），绑定学科/教师/教室/学生
 
-班型：
-- 1v1：班内 1 人（现有"学生+学科+教师"自动成班）
-- 1vN：一对多小班，多学生
+班型（一对几，教务手动填写"几"）：
+- 1v1 / 1v2 / 1v3 ...：一对 N 小班，班级最多 N 名学生（N 由教务填写）
+- 1vN：旧数据兼容（一对多不限人数，遗留值）
 """
 from sqlalchemy import Column, Integer, String, ForeignKey, Text
 from backend.models import Base
 from backend.utils.helpers import now_iso
+
+
+def class_pair_count(class_type) -> int:
+    """解析班型「一对几」的人数：1v1→1、1v3→3；旧数据 1vN（一对多不限人数）→ 0"""
+    t = str(class_type or "").strip().lower()
+    if t == "1vn":
+        return 0
+    if t.startswith("1v") and t[2:].isdigit():
+        return int(t[2:])
+    return 0
+
+
+def class_type_label(class_type) -> str:
+    """班型显示名：一对N；旧数据 1vN → 一对多（小班）"""
+    n = class_pair_count(class_type)
+    return f"一对{n}" if n else "一对多（小班）"
 
 
 class Class(Base):

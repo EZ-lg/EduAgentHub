@@ -11,6 +11,9 @@
             <button onclick="goToday()" class="btn-outline" style="padding:6px 12px;font-size:13px;">
                 <svg class="icon icon--md"><use href="#icon-calendar"/></svg> 今天
             </button>
+            <button onclick="showAdHocModal()" class="btn-primary" style="padding:6px 12px;font-size:13px;" title="给指定日期手动加一节课（一天可多节）">
+                <svg class="icon icon--md"><use href="#icon-plus"/></svg> 临时调课
+            </button>
             <select id="sched-teacher" onchange="loadDaySchedule()" class="text-sm border rounded-lg py-1.5 px-2" style="border-color:var(--border);">
                 <option value="">全部教师</option>
             </select>
@@ -32,6 +35,7 @@
 let periods = [];
 let rooms = [];
 let teacherList = [];
+let classList = [];   // 临时调课的班级下拉
 
 const WEEK_NAMES = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 function esc(s) { return Utils.escapeHtml(String(s ?? '')); }
@@ -47,10 +51,13 @@ async function initSchedule() {
     const today = new Date();
     document.getElementById('sched-date').value = fmtDate(today);
     try {
-        const [p, c, t] = await Promise.all([API.schedules.periods(), API.classrooms.list(), API.teachers.list()]);
+        const [p, c, t, cl] = await Promise.all([
+            API.schedules.periods(), API.classrooms.list(), API.teachers.list(), API.classes.list(),
+        ]);
         periods = (p.success && p.data) ? p.data : [];
         rooms = ((c.success && c.data) || []).filter(r => r.status === 'active');
         teacherList = (t.success && t.data) ? t.data : [];
+        classList = ((cl.success && cl.data) || []).filter(c2 => c2.status === 'active');
     } catch (e) { /* 基础数据失败不阻塞 */ }
     const sel = document.getElementById('sched-teacher');
     sel.innerHTML = '<option value="">全部教师</option>' + teacherList.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
@@ -60,6 +67,51 @@ async function initSchedule() {
 function goToday() {
     document.getElementById('sched-date').value = fmtDate(new Date());
     loadDaySchedule();
+}
+
+/* ---------- 临时调课：给指定日期手动加一节课（一天可多节，计入总课时流程） ---------- */
+function showAdHocModal() {
+    if (!classList.length) { showToast('暂无可用班级，请先在「班级管理」创建', 'info'); return; }
+    if (!rooms.length) { showToast('暂无教室，请先在「设置 → 教室管理」添加', 'info'); return; }
+    const todayStr = document.getElementById('sched-date').value || fmtDate(new Date());
+    Utils.showModal({
+        title: '临时调课',
+        subtitle: '为班级在指定日期加一节课（仅当天生效，一天可上多节）',
+        width: 560,
+        columns: 2,
+        fields: [
+            { key: 'class_id', label: '班级', type: 'select', required: true, options: classList.map(c => ({ v: c.id, label: `${c.name}（${c.student_count || 0}人）` })), section: '课程信息', full: true },
+            { key: 'date', label: '日期', type: 'date', required: true, default: todayStr, section: '课程信息' },
+            { key: 'start_time', label: '开始时间', type: 'time', required: true, section: '课程信息' },
+            { key: 'end_time', label: '结束时间', type: 'time', required: true, section: '课程信息' },
+            { key: 'classroom_id', label: '教室', type: 'select', required: true, options: rooms.map(r => ({ v: r.id, label: r.name + (r.location ? '（' + r.location + '）' : '') })), section: '资源' },
+            { key: 'teacher_id', label: '教师', type: 'select', options: teacherList.map(t => ({ v: t.id, label: t.name })), section: '资源' },
+        ],
+        onSubmit: async (data) => {
+            if (!data.start_time || !data.end_time || toMin(data.end_time) <= toMin(data.start_time)) {
+                showToast('请填写开始/结束时间（结束需晚于开始）', 'error');
+                return;
+            }
+            data.class_id = Number(data.class_id);
+            data.classroom_id = data.classroom_id ? Number(data.classroom_id) : null;
+            data.teacher_id = data.teacher_id ? Number(data.teacher_id) : null;
+            try {
+                const r = await API.schedules.adHoc(data);
+                if (r.success && r.data.created) {
+                    showToast(`已临时调课：${r.data.schedule.class_name} ${data.date} ${data.start_time}-${data.end_time}`, 'success');
+                    loadDaySchedule();
+                } else {
+                    const conflicts = (r.data && r.data.conflicts) || [];
+                    if (conflicts.length) {
+                        const lines = conflicts.map(c => c.message || c.time || '冲突').slice(0, 5).join('\n');
+                        showToast('临时调课冲突：\n' + lines, 'error');
+                    } else {
+                        showToast('临时调课失败：' + ((r.data && r.data.message) || '未知原因'), 'error');
+                    }
+                }
+            } catch (e) { showToast('临时调课失败：' + e.message, 'error'); }
+        },
+    });
 }
 
 /* ---------- 当天课表 ---------- */
@@ -134,10 +186,16 @@ function renderGrid(items) {
             html += `<td style="border-bottom:1px solid var(--border);border-left:1px solid var(--border-soft);padding:4px;vertical-align:top;">`;
             cellItems.forEach(it => {
                 const isTerm = it.term_type === 'summer_winter';
-                const st = isTerm ? 'background:#fdf2f8;border-color:#fbcfe8;' : 'background:#EDEBFE;border-color:#D6D2FB;';
+                const isAdhoc = !!it.is_adhoc;
+                // 临时调课用琥珀色区分（区别于周循环/寒暑假固定课）
+                const st = isAdhoc
+                    ? 'background:#FEF3C7;border-color:#FCD34D;'
+                    : (isTerm ? 'background:#fdf2f8;border-color:#fbcfe8;' : 'background:#EDEBFE;border-color:#D6D2FB;');
                 const students = (it.students || []).map(s => s.name).join(' ');
-                html += `<div class="rounded-md border px-1.5 py-1 mb-1" style="${st}">
-                    <div class="text-[11px] font-semibold text-gray-800 leading-tight">${esc(it.class_name)}${isTerm ? ' <span class="badge badge--warning" style="font-size:9px;padding:0 3px;">暑假</span>' : ''}</div>
+                // 需求5：整张课程卡可点击 → 进入对应班级管理
+                const cid = it.class_id;
+                html += `<div class="rounded-md border px-1.5 py-1 mb-1 sched-card" style="${st}${cid ? ';cursor:pointer;' : ''}" title="${cid ? '点击进入班级管理：' + esc(it.class_name) : ''}" ${cid ? `onclick="location.hash='#/classes/${cid}'"` : ''}>
+                    <div class="text-[11px] font-semibold text-gray-800 leading-tight">${esc(it.class_name)}${isAdhoc ? ' <span class="badge badge--danger" style="font-size:9px;padding:0 3px;">临时</span>' : (isTerm ? ' <span class="badge badge--warning" style="font-size:9px;padding:0 3px;">暑假</span>' : '')}</div>
                     <div class="text-[10px] font-medium num" style="color:#dc2626;">${esc(it.start_time)}-${esc(it.end_time)}</div>
                     <div class="text-[10px] text-gray-500 truncate"><svg class="icon" style="width:11px;height:11px;color:var(--text-3);vertical-align:-1px;"><use href="#icon-graduation-cap"/></svg> ${esc(it.teacher_name || '未指派')}</div>
                     ${students ? `<div class="text-[10px] text-gray-400 truncate" title="${esc(students)}"><svg class="icon" style="width:11px;height:11px;color:var(--text-3);vertical-align:-1px;"><use href="#icon-users"/></svg> ${esc(students)}</div>` : ''}
@@ -156,7 +214,7 @@ window.currentPageRefresh = loadDaySchedule;
 initSchedule();
 
 Object.assign(window, {
-    loadDaySchedule, goToday,
+    loadDaySchedule, goToday, showAdHocModal,
 });
 })();
 </script>

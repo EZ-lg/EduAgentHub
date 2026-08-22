@@ -3,6 +3,8 @@
 
 覆盖：班级 CRUD + 学生增减 + 一对一快捷建班 + 增学生冲突预检（P3 排课完整校验）
 """
+import re
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from backend.models import get_db
@@ -15,9 +17,21 @@ from backend.models.teacher import Teacher
 from backend.models.classroom import Classroom
 from backend.utils.activity import log_activity
 from backend.utils.helpers import success_response, now_iso
+from backend.models.class_ import class_pair_count, class_type_label
 from backend.services.term_schedule import compute_end_date, check_term_conflicts
 
 router = APIRouter(prefix="/api/classes", tags=["classes"])
+
+# 班型：一对几（教务手动填"几"），存 1v1/1v2/1v3...；兼容旧数据 1vN（一对多不限人数）
+CLASS_TYPE_PATTERN = re.compile(r"^1v\d+$")
+
+
+def _validate_class_type(value) -> str:
+    """校验班型值：1v1/1v2/... 或旧数据 1vN，非法抛 400；返回规范值"""
+    t = str(value or "").strip().lower()
+    if t == "1vn" or CLASS_TYPE_PATTERN.match(t):
+        return t
+    raise HTTPException(status_code=400, detail="班型格式应为「一对几」（如 1v2、1v5），或旧版 1vN")
 
 
 def _to_int(value, default=0):
@@ -86,9 +100,7 @@ def create_class(data: dict, db: Session = Depends(get_db)):
     name = data.get("name", "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="班级名称不能为空")
-    class_type = data.get("class_type", "1vN")
-    if class_type not in ("1v1", "1vN"):
-        raise HTTPException(status_code=400, detail="班型应为 1v1 或 1vN")
+    class_type = _validate_class_type(data.get("class_type", "1vN"))
 
     term_type = data.get("term_type", "semester")
     if term_type not in ("semester", "summer_winter"):
@@ -124,11 +136,13 @@ def create_class(data: dict, db: Session = Depends(get_db)):
     db.add(cls)
     db.flush()
 
-    # 批量添加学生（一对一强制只允许 1 人）
+    # 批量添加学生（一对N 班级最多 N 人；旧 1vN 不限）
     student_ids = data.get("student_ids") or []
-    if class_type == "1v1" and len(student_ids) > 1:
+    max_n = class_pair_count(class_type)
+    if max_n and len(student_ids) > max_n:
         db.delete(cls)
-        raise HTTPException(status_code=400, detail="一对一班级只能添加 1 名学生")
+        raise HTTPException(status_code=400,
+                            detail=f"{class_type_label(class_type)}班级最多 {max_n} 名学生，当前选了 {len(student_ids)} 人")
     for sid in student_ids:
         if not db.query(Student).filter(Student.id == sid).first():
             continue  # 忽略不存在的学生
@@ -169,13 +183,13 @@ def update_class(class_id: int, data: dict, db: Session = Depends(get_db)):
     if "name" in data and data["name"] is not None:
         cls.name = data["name"].strip()
     if "class_type" in data:
-        if data["class_type"] not in ("1v1", "1vN"):
-            raise HTTPException(status_code=400, detail="班型应为 1v1 或 1vN")
-        if data["class_type"] == "1v1":
-            cnt = db.query(ClassStudent).filter(ClassStudent.class_id == cls.id).count()
-            if cnt > 1:
-                raise HTTPException(status_code=400, detail="该班已有超过 1 名学生，无法改为一对一")
-        cls.class_type = data["class_type"]
+        new_type = _validate_class_type(data["class_type"])
+        max_n = class_pair_count(new_type)
+        cnt = db.query(ClassStudent).filter(ClassStudent.class_id == cls.id).count()
+        if max_n and cnt > max_n:
+            raise HTTPException(status_code=400,
+                                detail=f"{class_type_label(new_type)}班级最多 {max_n} 名学生，当前已有 {cnt} 人")
+        cls.class_type = new_type
     # 整数字段归一化（前端表单可能传字符串，否则下游 int<str 比较 TypeError → 500）
     INT_FIELDS = {"total_lessons", "weekly_frequency", "duration_minutes"}
     for field in ["subject_id", "subject_name", "teacher_id", "classroom_id",
@@ -253,10 +267,12 @@ def add_student_to_class(class_id: int, data: dict, db: Session = Depends(get_db
     if not student:
         raise HTTPException(status_code=404, detail="学生不存在")
 
-    if cls.class_type == "1v1":
+    max_n = class_pair_count(cls.class_type)
+    if max_n:
         cnt = db.query(ClassStudent).filter(ClassStudent.class_id == cls.id).count()
-        if cnt >= 1:
-            raise HTTPException(status_code=400, detail="一对一班级已有一名学生")
+        if cnt >= max_n:
+            raise HTTPException(status_code=400,
+                                detail=f"{class_type_label(cls.class_type)}班级已有 {cnt} 名学生，已达上限 {max_n} 人")
 
     exists = db.query(ClassStudent).filter(
         ClassStudent.class_id == cls.id,

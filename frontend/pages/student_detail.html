@@ -268,7 +268,7 @@ function renderSubjectCards(ov) {
             ? `<span class="text-[11px] text-gray-400">v${sub.plan.version} · ${sub.plan.lesson_count}课${sub.plan.total_hours ? ' · ' + sub.plan.total_hours + 'h' : ''}</span>`
             : '';
         const classText = sub.class_name
-            ? `<span class="inline-flex items-center gap-1"><svg class="icon icon--sm"><use href="#${sub.class_type === '1v1' ? 'icon-user' : 'icon-users'}"/></svg> ${sub.class_type === '1v1' ? '一对一' : '小班'}${sub.teacher_name ? ' · ' + esc(sub.teacher_name) : ''}</span>`
+            ? `<span class="inline-flex items-center gap-1"><svg class="icon icon--sm"><use href="#${pairNumOf(sub.class_type) === 1 ? 'icon-user' : 'icon-users'}"/></svg> ${classTypeLabel(sub.class_type)}${sub.teacher_name ? ' · ' + esc(sub.teacher_name) : ''}</span>`
             : '<span class="text-gray-300">未报班</span>';
         const spark = sparkline(sub.scores);
         return `<div class="subject-card ${active}" onclick="selectSubject(${sub.id})">
@@ -536,6 +536,9 @@ function renderStudentChat() {
 
 /* ---------- P6 通用辅助 ---------- */
 function esc(s) { return Utils.escapeHtml(String(s ?? '')); }
+// 班型「一对几」：1v1→一对1、1v3→一对3、旧 1vN→一对多（小班）
+function pairNumOf(ct) { const m = /^1v(\d+)$/i.exec(String(ct || '')); return m ? parseInt(m[1]) : 0; }
+function classTypeLabel(ct) { const n = pairNumOf(ct); return n ? `一对${n}` : '一对多（小班）'; }
 
 function safeParse(str, fallback) {
     try { return JSON.parse(str || 'null') || fallback; } catch (e) { return fallback; }
