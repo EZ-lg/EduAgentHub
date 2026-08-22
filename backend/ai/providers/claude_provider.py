@@ -18,7 +18,7 @@ class ClaudeProvider(BaseLLMProvider):
 
     def __init__(self, config: dict = None):
         super().__init__(config)
-        kwargs = {"api_key": self.api_key or "EMPTY", "timeout": 60.0}
+        kwargs = {"api_key": self.api_key or "EMPTY", "timeout": 120.0}  # 长报告常超 60s
         if self.base_url and self.base_url != self.default_base_url:
             kwargs["base_url"] = self.base_url
         self._client = Anthropic(**kwargs)

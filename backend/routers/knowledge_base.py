@@ -128,9 +128,17 @@ def upload_doc(
     if fmt not in document_parser.SUPPORTED_EXTS:
         raise HTTPException(status_code=400, detail=f"不支持的文件格式：{ext or '未知'}（支持 PDF / Word / TXT / Markdown）")
 
-    content = file.file.read()
-    if len(content) > document_parser.MAX_FILE_SIZE:
-        raise HTTPException(status_code=400, detail="文件超过 50MB 上限")
+    # 先按文件指针末尾取大小，超大文件直接拒绝，避免整个读进内存（1GB 文件会占满内存）
+    f = file.file
+    try:
+        f.seek(0, 2)  # SEEK_END
+        size = f.tell()
+        f.seek(0)
+    except (OSError, AttributeError):
+        size = 0
+    if size > document_parser.MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail=f"文件超过 50MB 上限（当前 {size // 1024 // 1024}MB）")
+    content = f.read()
 
     file_path = _save_upload(content, filename)
     doc_category = "待分类" if auto_category else ((category or "").strip() or "其他")
@@ -143,8 +151,16 @@ def upload_doc(
         status="active",
         index_status="pending",
     )
-    db.add(doc)
-    db.commit()
+    try:
+        db.add(doc)
+        db.commit()
+    except Exception:
+        # DB 写入失败清理已落盘文件，避免 data/uploads/ 残留孤儿
+        try:
+            os.remove(file_path)
+        except OSError:
+            pass
+        raise HTTPException(status_code=500, detail="保存文档记录失败，请重试")
     db.refresh(doc)
     background_tasks.add_task(_ingest_doc_async, doc.id, auto_category)
     return success_response(doc.to_dict())
@@ -225,7 +241,11 @@ def search_docs(data: dict, db: Session = Depends(get_db)):
     query = (data.get("query") or "").strip()
     if not query:
         raise HTTPException(status_code=400, detail="请输入检索内容")
-    top_k = max(1, min(int(data.get("top_k") or 5), 20))
+    try:
+        top_k = int(data.get("top_k") or 5)
+    except (TypeError, ValueError):
+        top_k = 5
+    top_k = max(1, min(top_k, 20))
     include_disabled = bool(data.get("include_disabled"))
     results = kb_service.search(db, query, top_k=top_k, include_disabled=include_disabled)
     return success_response(results)

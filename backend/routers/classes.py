@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from backend.models import get_db
 from backend.models.class_ import Class
+from backend.models.class_schedule import ClassSchedule
 from backend.models.class_student import ClassStudent
 from backend.models.student import Student
 from backend.models.subject import Subject
@@ -17,6 +18,16 @@ from backend.utils.helpers import success_response, now_iso
 from backend.services.term_schedule import compute_end_date, check_term_conflicts
 
 router = APIRouter(prefix="/api/classes", tags=["classes"])
+
+
+def _to_int(value, default=0):
+    """整数字段归一化：前端表单可能传字符串（如 "5"），非法/空值回退 default"""
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def _class_detail(db: Session, cls: Class) -> dict:
@@ -82,7 +93,7 @@ def create_class(data: dict, db: Session = Depends(get_db)):
     term_type = data.get("term_type", "semester")
     if term_type not in ("semester", "summer_winter"):
         raise HTTPException(status_code=400, detail="班型应为 semester（学期）或 summer_winter（寒暑假）")
-    total_lessons = int(data.get("total_lessons") or 0)
+    total_lessons = _to_int(data.get("total_lessons"))
     daily_start = data.get("daily_start", "")
     daily_end = data.get("daily_end", "")
 
@@ -104,8 +115,8 @@ def create_class(data: dict, db: Session = Depends(get_db)):
         total_lessons=total_lessons,
         daily_start=daily_start,
         daily_end=daily_end,
-        weekly_frequency=data.get("weekly_frequency", 2),
-        duration_minutes=data.get("duration_minutes", 120),
+        weekly_frequency=_to_int(data.get("weekly_frequency"), 2),
+        duration_minutes=_to_int(data.get("duration_minutes"), 120),
         start_date=data.get("start_date", ""),
         end_date=end_date,
         notes=data.get("notes", ""),
@@ -165,11 +176,13 @@ def update_class(class_id: int, data: dict, db: Session = Depends(get_db)):
             if cnt > 1:
                 raise HTTPException(status_code=400, detail="该班已有超过 1 名学生，无法改为一对一")
         cls.class_type = data["class_type"]
+    # 整数字段归一化（前端表单可能传字符串，否则下游 int<str 比较 TypeError → 500）
+    INT_FIELDS = {"total_lessons", "weekly_frequency", "duration_minutes"}
     for field in ["subject_id", "subject_name", "teacher_id", "classroom_id",
                   "term_type", "total_lessons", "daily_start", "daily_end",
                   "weekly_frequency", "duration_minutes", "start_date", "end_date", "notes"]:
         if field in data and data[field] is not None:
-            setattr(cls, field, data[field])
+            setattr(cls, field, _to_int(data[field]) if field in INT_FIELDS else data[field])
     if cls.total_lessons is None:
         cls.total_lessons = 0
 
@@ -184,6 +197,12 @@ def update_class(class_id: int, data: dict, db: Session = Depends(get_db)):
             db.rollback()
             raise HTTPException(status_code=400,
                                 detail={"message": "班期存在时间冲突", "conflicts": conflicts})
+
+    # 班级教师/教室变更后，同步该班 active 课次的冗余字段（否则冲突检测用旧教师/旧教室 → 误报/漏检）
+    db.query(ClassSchedule).filter(
+        ClassSchedule.class_id == cls.id,
+        ClassSchedule.status == "active",
+    ).update({"teacher_id": cls.teacher_id, "classroom_id": cls.classroom_id})
 
     cls.updated_at = now_iso()
     log_activity(db, "编辑班级", f"班级「{cls.name}」")
@@ -357,8 +376,8 @@ def create_class_from_subject(subject_id: int, data: dict, db: Session = Depends
         teacher_id=data.get("teacher_id"),
         classroom_id=data.get("classroom_id"),
         class_type="1v1",
-        weekly_frequency=data.get("weekly_frequency", 2),
-        duration_minutes=data.get("duration_minutes", 120),
+        weekly_frequency=_to_int(data.get("weekly_frequency"), 2),
+        duration_minutes=_to_int(data.get("duration_minutes"), 120),
         start_date=data.get("start_date", ""),
         end_date=data.get("end_date", ""),
     )

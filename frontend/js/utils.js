@@ -8,6 +8,7 @@ window.Utils = {
     formatDate(isoStr, withTime = false) {
         if (!isoStr) return '';
         const d = new Date(isoStr);
+        if (isNaN(d.getTime())) return '';  // 非法日期避免输出 "NaN-NaN-NaN"
         const pad = n => String(n).padStart(2, '0');
         const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
         if (withTime) {
@@ -220,7 +221,8 @@ window.Utils = {
             });
             mask.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
-                    mask.querySelector('[data-ok]').click();
+                    // hideOk 弹窗（版本历史/预览等）没有 [data-ok]，需判空
+                    mask.querySelector('[data-ok]')?.click();
                 }
             });
             const first = mask.querySelector('input,select,textarea');
@@ -233,10 +235,12 @@ window.Utils = {
 
     /**
      * 确认弹窗
-     * opts: { title, message, danger, onOk }
+     * opts: { title, message, messageHtml, danger, onOk }
+     *   message      普通文本 → 自动 HTML 转义（含用户数据的删除确认必须走这里，防存储型 XSS）
+     *   messageHtml  需展示 HTML（如 <br>/<b>）时传此字段，替代 message
      */
     confirmDialog(opts) {
-        const { title = '确认操作', message = '', danger = false, onOk } = opts;
+        const { title = '确认操作', message = '', messageHtml = null, danger = false, onOk } = opts;
         document.querySelector('.ta-modal-mask')?.remove();
 
         const mask = document.createElement('div');
@@ -247,10 +251,12 @@ window.Utils = {
         panel.className = 'ta-modal-panel';
         panel.style.width = '420px';
 
+        const bodyHtml = (messageHtml !== null) ? messageHtml : Utils.escapeHtml(message);
+
         panel.innerHTML = `
             <div class="ta-modal-body pt-5">
                 <div class="font-semibold text-gray-800 text-sm mb-2">${Utils.escapeHtml(title)}</div>
-                <div class="text-sm text-gray-500 leading-relaxed">${message}</div>
+                <div class="text-sm text-gray-500 leading-relaxed">${bodyHtml}</div>
             </div>
             <div class="ta-modal-foot">
                 <button class="btn-outline" data-close style="padding:7px 18px;">取消</button>

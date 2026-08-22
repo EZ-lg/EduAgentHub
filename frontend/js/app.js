@@ -64,8 +64,9 @@ function executeInlineScripts(container) {
         }
         oldScript.replaceWith(newScript);
     });
-    // 脚本执行成功，重置加载看门狗的重载标记
-    try { sessionStorage.removeItem('ta_wdog'); } catch (e) {}
+    // 注意：不在此处无条件清除 ta_wdog —— 页面脚本是异步执行，若脚本崩溃，
+    // 此处仍会执行导致「重载后再次清除」→ 看门狗无限刷新。
+    // 清除时机移到看门狗逻辑中，仅当页面脚本确认正常运行后才重置。
 }
 
 // ============================================================
@@ -108,10 +109,17 @@ function createPageComponent(pageName, title) {
                 try {
                     if (!this.$el || !this.$el.isConnected) return;
                     if (this.$el.textContent.includes('加载中')) {
+                        // 页面脚本没跑起来（currentPageRefresh 未注册）且未重载过 → 强制刷新一次兜底
                         if (typeof window.currentPageRefresh !== 'function' && sessionStorage.getItem('ta_wdog') !== '1') {
                             sessionStorage.setItem('ta_wdog', '1');
                             location.reload();
+                            return;
                         }
+                    }
+                    // 页面脚本正常运行（已注册刷新函数）→ 清除重载标记，允许下次故障再兜底一次
+                    // 崩溃场景下 ta_wdog 保持 '1'，重载后仍崩溃也不会再刷（防无限整页刷新）
+                    if (typeof window.currentPageRefresh === 'function') {
+                        try { sessionStorage.removeItem('ta_wdog'); } catch (e) {}
                     }
                 } catch (e) { console.error('看门狗异常:', e); }
             }, 6000);
@@ -240,10 +248,12 @@ const app = createApp({
         }
         // 加载侧边栏
         try {
-            const resp = await fetch('/components/navbar.html');
+            const resp = await fetch('/components/navbar.html?v=' + (window.APP_VERSION || ''));
             if (resp.ok) {
                 const html = await resp.text();
                 document.getElementById('navbar-container').innerHTML = html;
+                const verEl = document.getElementById('navbar-version');
+                if (verEl) verEl.textContent = `v2.0 · build ${window.APP_VERSION || ''}`;
             }
         } catch (err) {
             console.error('Navbar load error:', err);

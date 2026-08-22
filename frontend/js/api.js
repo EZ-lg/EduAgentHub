@@ -14,13 +14,16 @@ window.API = {
         }
         try {
             const resp = await fetch(this.BASE + url, config);
-            const json = await resp.json();
+            // 先取文本再解析：非 JSON 响应（网关 502 / 代理 HTML 页）不会抛 SyntaxError 给用户看天书
+            const text = await resp.text();
+            let json;
+            try { json = JSON.parse(text); } catch (e) { json = {}; }
             if (!resp.ok) {
                 // detail/error 可能是对象（如 {message, conflicts}），保留到 err.detail 供前端展示冲突
                 const rawDetail = (json.detail !== undefined) ? json.detail : json.error;
                 const msg = (rawDetail && typeof rawDetail === 'object')
                     ? (rawDetail.message || '操作失败')
-                    : (rawDetail || `HTTP ${resp.status}`);
+                    : (rawDetail || (text && text.slice(0, 120)) || `HTTP ${resp.status}`);
                 const err = new Error(String(msg));
                 if (rawDetail && typeof rawDetail === 'object') err.detail = rawDetail;
                 throw err;
@@ -173,7 +176,11 @@ window.API = {
                 fd.append('auto_category', autoCategory ? 'true' : 'false');
                 fd.append('file', file);
                 return fetch('/api/knowledge-docs/upload', { method: 'POST', body: fd })
-                    .then(r => r.json().then(json => ({ ok: r.ok, json })))
+                    .then(r => r.text().then(text => {
+                        let json = {};
+                        try { json = JSON.parse(text); } catch (e) { json = {}; }
+                        return { ok: r.ok, json };
+                    }))
                     .then(({ ok, json }) => {
                         if (!ok) throw new Error(json.detail || json.error || '上传失败');
                         return json;

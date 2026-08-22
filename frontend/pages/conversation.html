@@ -197,7 +197,7 @@ async function endConversation() {
     Utils.confirmDialog({
         title: '结束对话',
         danger: true,
-        message: '结束对话后将生成学情总结，本次对话不可继续。<br>如需再次采集需重新建档。确定结束吗？',
+        messageHtml: '结束对话后将生成学情总结，本次对话不可继续。<br>如需再次采集需重新建档。确定结束吗？',
         onOk: async () => {
             try {
                 const res = await API.conversations.end(subjectId, { conversation_id: state.conversationId });

@@ -654,7 +654,9 @@ async function exportDocx() {
             throw new Error(msg);
         }
         const blob = await resp.blob();
-        const fname = `${state.studentName || '学生'}-${state.subjectName || ''}-冲刺学习计划.docx`;
+        // 学生/学科名可能含 / \ : 等非法文件名字符，清洗后再用于下载文件名
+        const clean = s => String(s || '').replace(/[\\/:*?"<>|\r\n]/g, '_').trim();
+        const fname = `${clean(state.studentName) || '学生'}-${clean(state.subjectName)}-冲刺学习计划.docx`;
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;

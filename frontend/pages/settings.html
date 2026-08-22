@@ -233,16 +233,18 @@
    ============================================================ */
 let PROVIDER_META = {};   // provider 元信息缓存
 
-/* 全局错误可见化：脚本里任何报错都显示出来，便于排查 */
-window.addEventListener('error', function (e) {
+/* 全局错误可见化：脚本里任何报错都显示出来，便于排查
+   保存处理器引用供 __pageUnmounted 移除，避免反复进出设置页累积监听 */
+const __onSettingsError = function (e) {
     console.error('页面脚本错误:', e.message);
     showPageError('页面脚本出错：' + e.message);
-});
+};
+window.addEventListener('error', __onSettingsError);
 function showPageError(msg) {
     const box = document.getElementById('page-error');
     if (box) {
         box.classList.remove('hidden');
-        box.innerHTML = '<svg class="icon icon--sm inline mr-1 align-middle"><use href="#icon-alert-triangle"/></svg>' + (msg || '未知错误') +
+        box.innerHTML = '<svg class="icon icon--sm inline mr-1 align-middle"><use href="#icon-alert-triangle"/></svg>' + Utils.escapeHtml(msg || '未知错误') +
             '<button type="button" class="ml-2 text-xs underline" onclick="this.parentElement.classList.add(\'hidden\')">关闭</button>';
     }
 }
@@ -629,6 +631,10 @@ function toggleKey(inputId, btn) {
 }
 
 initSettings();
+// 离开设置页时移除全局 error 监听（app.js 导航卸载时调用 __pageUnmounted）
+window.__pageUnmounted = function () {
+    window.removeEventListener('error', __onSettingsError);
+};
 
 /* ---------- IIFE 作用域导出：供内联 onclick 调用 ---------- */
 Object.assign(window, {

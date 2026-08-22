@@ -365,10 +365,22 @@ def confirm_plan(data: dict, db: Session = Depends(get_db)):
             "teacher_id": it.get("teacher_id"),
             "student_ids": _class_student_ids(db, class_id),
         })
-    existing = [r.to_dict() for r in db.query(ClassSchedule).filter(ClassSchedule.status == "active").all()]
+    # 冲突校验：排除本班旧课次（即将归档，避免「自己占自己」误判），
+    # 只校验「新方案内部」+「新方案 vs 其他班 active 占用」
+    existing = [r.to_dict() for r in db.query(ClassSchedule).filter(
+        ClassSchedule.status == "active", ClassSchedule.class_id != class_id).all()]
     for r in existing:
         r["student_ids"] = _class_student_ids(db, r["class_id"])
-    conflicts = scheduler.check_conflicts_batch(existing + new_items)
+    conflicts = scheduler.check_conflicts_batch(new_items)
+    for it in new_items:
+        for c in scheduler.check_conflict(existing, it):
+            c["on_item"] = {
+                "class_id": class_id,
+                "weekday": it["weekday"],
+                "start_time": it["start_time"],
+                "end_time": it["end_time"],
+            }
+            conflicts.append(c)
     if conflicts:
         return success_response({"confirmed": False, "conflicts": _enrich_conflicts(db, conflicts),
                                  "message": "存在时间冲突，请调整后再确认"})

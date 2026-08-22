@@ -32,6 +32,8 @@ from backend.utils.helpers import now_iso
 
 REPORT_TEMPERATURE = 0.3
 PLAN_MAX_ROWS = 20
+# 整份报告（10 章 + 8~20 行规划）常超过默认 4096 token，生成类调用显式放宽，避免截断成坏 JSON
+REPORT_MAX_TOKENS = 8192
 # 章式计划：10 个固定章节前缀 + 默认标题；summary/plan/conclusion 为独立字段
 CHAPTER_PREFIXES = ("一、", "二、", "三、", "四、", "五、", "六、", "七、", "八、", "九、", "十、")
 DEFAULT_CHAPTER_TITLES = {
@@ -87,7 +89,7 @@ def _call_llm(prompt: str, temperature: float = REPORT_TEMPERATURE) -> str:
         return llm.chat([
             {"role": "system", "content": system},
             {"role": "user", "content": prompt},
-        ], temperature=temperature) or ""
+        ], temperature=temperature, max_tokens=REPORT_MAX_TOKENS) or ""
     except HTTPException:
         raise
     except Exception as e:
@@ -417,10 +419,13 @@ def regenerate_report(db: Session, report_id: int, data: dict = None) -> dict:
             original["conclusion"] = parsed["conclusion"]
         elif section == "plan":
             plan_rows = parsed["plan"]
-            original["plan"] = plan_rows
-            plan = _create_course_plan(db, report.subject_id, plan_rows)
-            if plan:
-                report.course_plan_id = plan.id
+            # 仅当 AI 返回非空规划才覆盖，避免空结果把报告内嵌课程规划表静默清空
+            # （与「六、」章节分支的守卫保持一致）
+            if plan_rows:
+                original["plan"] = plan_rows
+                plan = _create_course_plan(db, report.subject_id, plan_rows)
+                if plan:
+                    report.course_plan_id = plan.id
         else:  # 章节前缀
             new_ch = _parse_chapter(parsed["chapters"][0])
             prefix = section[:2]

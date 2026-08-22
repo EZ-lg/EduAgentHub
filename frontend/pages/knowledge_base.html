@@ -59,6 +59,7 @@
 const EXT_LABEL = { pdf: 'PDF', docx: 'Word', txt: 'TXT', md: 'Markdown' };
 let docList = [];
 let currentCategory = '';
+let kbPollTimer = null;  // 入库轮询定时器（离开页面时清理，避免卸载后持续报错）
 
 function esc(s) { return Utils.escapeHtml(String(s ?? '')); }
 function fmtDate(s) { return Utils.formatDate(s, true); }
@@ -83,7 +84,10 @@ async function loadDocs() {
         const r = await API.knowledgeBase.list(currentCategory);
         docList = (r.success && r.data) ? r.data : [];
     } catch (e) { docList = []; }
-    document.getElementById('kb-count').textContent = docList.length ? `（${docList.length} 篇）` : '';
+    // 页面已卸载时 tbody 等为 null，直接返回（不抛 TypeError 干扰 console）
+    if (!tbody || !table) return;
+    const countEl = document.getElementById('kb-count');
+    if (countEl) countEl.textContent = docList.length ? `（${docList.length} 篇）` : '';
     if (!table) return;
     loading.classList.add('hidden');
     checkEmbedReady();
@@ -112,9 +116,12 @@ async function loadDocs() {
             </td>
         </tr>`;
     }).join('');
-    // 有文档还在入库：轮询刷新，直到全部完成
+    // 有文档还在入库：轮询刷新，直到全部完成（保存 timer 供卸载时清理）
     const processing = docList.some(d => d.index_status === 'pending' || d.index_status === 'processing');
-    if (processing) setTimeout(loadDocs, 2000);
+    if (processing) {
+        if (kbPollTimer) clearTimeout(kbPollTimer);
+        kbPollTimer = setTimeout(loadDocs, 2000);
+    }
 }
 
 function statusCell(d) {
@@ -416,6 +423,10 @@ function goToQA() { location.hash = '#/knowledge-base/qa'; }
 
 /* ---------- 注册刷新 ---------- */
 window.currentPageRefresh = loadDocs;
+// 离开页面时清理入库轮询定时器（防止卸载后定时器仍在跑、DOM 已销毁报错）
+window.__pageUnmounted = function () {
+    if (kbPollTimer) { clearTimeout(kbPollTimer); kbPollTimer = null; }
+};
 
 /* ---------- IIFE 作用域导出 ---------- */
 Object.assign(window, {

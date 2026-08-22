@@ -146,8 +146,9 @@ function deleteTeacher(id) {
     });
 }
 
-/* ---------- 搜索 ---------- */
-function searchTeachers(v) { searchKw = v.trim(); loadTeachers(); }
+/* ---------- 搜索（防抖，避免每敲一个字符都发请求） ---------- */
+const debouncedSearch = Utils.debounce(() => loadTeachers(), 300);
+function searchTeachers(v) { searchKw = v.trim(); debouncedSearch(); }
 
 /* ---------- 注册刷新（顶部「↻ 刷新」/切回标签页自动调用） ---------- */
 window.currentPageRefresh = loadTeachers;

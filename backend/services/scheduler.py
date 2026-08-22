@@ -131,8 +131,8 @@ def _plan_key(plan: Dict[int, list]) -> str:
     """方案指纹（去重用）"""
     parts = []
     for cls_id in sorted(plan):
-        for item in sorted(plan[cls_id], key=lambda x: (x["weekday"], x["start_time"])):
-            parts.append(f"{cls_id}:{item['weekday']}-{item['start_time']}")
+        for item in sorted(plan[cls_id], key=lambda x: (x["weekday"], x["start_time"], x["end_time"])):
+            parts.append(f"{cls_id}:{item['weekday']}-{item['start_time']}-{item['end_time']}")
     return "|".join(parts)
 
 
@@ -212,5 +212,6 @@ def schedule_to_weekly(schedules: List[dict]) -> dict:
     for s in schedules:
         weekly.setdefault(s.get("weekday", 0), []).append(s)
     for d in weekly:
-        weekly[d].sort(key=lambda x: x.get("start_time", ""))
+        # 按分钟数排序而非字符串比较（"10:00" < "9:00" 字符串比较会排错）
+        weekly[d].sort(key=lambda x: _to_min(x.get("start_time", "")))
     return weekly

@@ -22,7 +22,7 @@ from backend.utils.helpers import success_response, now_iso
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 
-def _parse_value(value) -> dict:
+def _parse_value(value):
     """将存储的 value_json 解析为 JSON 对象"""
     if value is None:
         return {}
@@ -30,9 +30,29 @@ def _parse_value(value) -> dict:
         return value
     try:
         data = json.loads(value)
-        return data if isinstance(data, dict) else {}
+        # 兼容列表设置（如 class_periods），此前列表会被降级成 {}
+        return data if isinstance(data, (dict, list)) else {}
     except (json.JSONDecodeError, TypeError):
         return {}
+
+
+def _mask_api_key(key: str) -> str:
+    """API key 掩码显示：前 4 位 + **** + 后 4 位（短 key 全掩）"""
+    if not key:
+        return ""
+    if len(key) <= 8:
+        return "****"
+    return f"{key[:4]}****{key[-4:]}"
+
+
+def _sanitize_config(config) -> dict:
+    """GET 返回前对 LLM/Embedding 配置的 api_key 掩码，避免网络部署下明文泄露"""
+    if not isinstance(config, dict):
+        return config
+    out = dict(config)
+    if out.get("api_key"):
+        out["api_key"] = _mask_api_key(str(out["api_key"]))
+    return out
 
 
 def _read_saved(db: Session, key: str) -> Optional[dict]:
@@ -61,7 +81,11 @@ def get_settings(db: Session = Depends(get_db)):
     settings = db.query(Setting).all()
     result = {}
     for s in settings:
-        result[s.key] = _parse_value(s.value_json)
+        if s.key in (LLM_CONFIG_KEY, EMBEDDING_CONFIG_KEY):
+            # 敏感配置掩码 api_key（前端测试连接走 /test-llm 等接口，无需明文）
+            result[s.key] = _sanitize_config(_parse_value(s.value_json))
+        else:
+            result[s.key] = _parse_value(s.value_json)
     return success_response(result)
 
 
@@ -76,6 +100,18 @@ def update_settings(data: dict, db: Session = Depends(get_db)):
     """批量更新设置。data 形如 {key: value}，value 为 dict/list 时自动转 JSON 存储"""
     keys = list(data.keys())
     for key, value in data.items():
+        # 前端把掩码后的 api_key（含 ****）原样回传时，保留数据库里的真实 key，避免掩码覆盖
+        if key in (LLM_CONFIG_KEY, EMBEDDING_CONFIG_KEY) and isinstance(value, dict) \
+                and isinstance(value.get("api_key"), str) and "****" in value["api_key"]:
+            existing = db.query(Setting).filter(Setting.key == key).first()
+            if existing and existing.value_json:
+                try:
+                    old = json.loads(existing.value_json)
+                    if isinstance(old, dict) and old.get("api_key"):
+                        value = dict(value)
+                        value["api_key"] = old["api_key"]
+                except (json.JSONDecodeError, TypeError):
+                    pass
         value_str = json.dumps(value, ensure_ascii=False) if isinstance(value, (dict, list)) else str(value)
         setting = db.query(Setting).filter(Setting.key == key).first()
         if setting:

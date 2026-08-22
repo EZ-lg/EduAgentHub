@@ -78,7 +78,10 @@ def check_term_conflicts(db, cls_id: int) -> list:
     students = set(_class_students(db, cls.id))
     conflicts = []
 
-    term_schedules = db.query(ClassSchedule).filter(ClassSchedule.status == "active").all()
+    # 排除本班自己的课次（该班已在排课 API 生成过 class_schedules 时，
+    # 不应与自己冲突——否则寒暑假班排课后就再也不能编辑）
+    term_schedules = db.query(ClassSchedule).filter(
+        ClassSchedule.status == "active", ClassSchedule.class_id != cls.id).all()
     other_terms = db.query(Class).filter(
         Class.term_type == "summer_winter", Class.status == "active", Class.id != cls.id).all()
 

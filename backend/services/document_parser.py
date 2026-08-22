@@ -10,6 +10,8 @@
 - 成功：text 为纯文本，error 为 None
 - 失败：text 为空串，error 为可读错误信息（路由层据此抛 400）
 """
+import os
+
 from fastapi import HTTPException
 
 # 支持的扩展名 → 格式标识
@@ -28,8 +30,7 @@ def parse_file(file_path: str, file_type: str):
     fmt = EXT_ALIAS.get(file_type, file_type)
 
     try:
-        with open(file_path, "rb") as f:
-            size = len(f.read())
+        size = os.path.getsize(file_path)
         if size > MAX_FILE_SIZE:
             return "", f"文件超过 50MB 上限（当前 {size // 1024 // 1024}MB）"
     except OSError as e:

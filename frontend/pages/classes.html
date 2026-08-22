@@ -124,6 +124,8 @@ let classroomList = [];
 let allStudents = [];
 
 function esc(s) { return Utils.escapeHtml(String(s ?? '')); }
+// JS 单引号字符串转义：内联 onclick 里插入节次标签/时间（机构自定义可能含引号）
+function jsStr(s) { return String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
 
 /* ---------- 基础数据加载 ---------- */
 async function loadBaseData() {
@@ -624,7 +626,7 @@ async function selectSlotWeekday(wd) {
                                 const names = [...new Set(taken.map(t => t.class_name).filter(Boolean))];
                                 return `<td style="padding:6px 8px;"><div class="text-xs text-gray-400 bg-gray-100 rounded px-2 py-1.5 text-center truncate" title="${esc(names.join('、'))}">${esc(names[0] || '已占用')}</div></td>`;
                             }
-                            return `<td style="padding:6px 8px;"><button onclick="confirmAddSlot(${wd},'${p.start}','${p.end}','${p.label || ''}',${r.id})" class="w-full text-xs text-green-700 bg-green-50 hover:bg-green-100 rounded px-2 py-1.5 text-center transition">空闲</button></td>`;
+                            return `<td style="padding:6px 8px;"><button onclick="confirmAddSlot(${wd},'${jsStr(p.start)}','${jsStr(p.end)}','${jsStr(p.label)}',${r.id})" class="w-full text-xs text-green-700 bg-green-50 hover:bg-green-100 rounded px-2 py-1.5 text-center transition">空闲</button></td>`;
                         }).join('')}
                     </tr>`;
                 }).join('')}
@@ -771,10 +773,13 @@ if (classId) { loadClassDetail(); } else { loadClasses(); }
 window.currentPageRefresh = classId ? loadClassDetail : loadClasses;
 
 // 修 bug：/classes/4 → /classes/5 是同一路由记录，组件不重挂载，脚本不会重跑。
-// 监听 hashchange，classId 变化时整页重载以加载新班级。
+// 监听 hashchange，仅当仍在「班级详情」路由且 classId 变化时整页重载以加载新班级。
+// （此前 newId !== classId 就对任意 hash 变化 reload，导致从班级详情切到学生/课表等
+//   任何其它路由都会先整页刷新一次，闪烁且丢失未保存输入）
 function onClassHashChange() {
     const parts = location.hash.split('/');
-    const newId = parts[2] ? parseInt(parts[2]) : null;
+    if (!(parts[1] === 'classes' && parts[2])) return;   // 离开班级详情路由 → 交给路由正常卸载
+    const newId = parseInt(parts[2]);
     if (newId !== classId) location.reload();
 }
 window.addEventListener('hashchange', onClassHashChange);

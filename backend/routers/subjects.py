@@ -4,6 +4,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from backend.models import get_db
+from backend.models.student import Student
 from backend.models.subject import Subject
 from backend.utils.activity import log_activity
 from backend.utils.helpers import success_response, now_iso
@@ -23,8 +24,13 @@ def list_subjects(student_id: int, db: Session = Depends(get_db)):
 @router.post("/subjects")
 def create_subject(data: dict, db: Session = Depends(get_db)):
     """新增学科"""
+    student_id = data.get("student_id")
+    if not student_id:
+        raise HTTPException(status_code=400, detail="缺少 student_id")
+    if not db.query(Student).filter(Student.id == student_id).first():
+        raise HTTPException(status_code=404, detail="学生不存在")
     subject = Subject(
-        student_id=data.get("student_id"),
+        student_id=student_id,
         name=data.get("name", ""),
         status=data.get("status", "active"),
     )

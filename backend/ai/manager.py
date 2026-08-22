@@ -7,6 +7,7 @@ AIManager 单例 — 负责 LLM / Embedding Provider 的创建与缓存
 - 全局通过 ai_manager 单例使用
 """
 import json
+import logging
 import threading
 from typing import Optional
 
@@ -14,6 +15,8 @@ from backend.ai.base import BaseLLMProvider
 from backend.ai.factory import create_provider
 from backend.models import SessionLocal
 from backend.models.setting import Setting
+
+logger = logging.getLogger(__name__)
 
 LLM_CONFIG_KEY = "llm_config"
 EMBEDDING_CONFIG_KEY = "embedding_config"
@@ -76,6 +79,9 @@ class AIManager:
         try:
             provider = create_provider(config)
         except Exception:
+            # 不要静默吞掉：非法配置（如 temperature 填了非数字）会在此抛错，
+            # 若吞掉会让 is_configured()=True 但 get_llm()=None，调用方误报"AI 未配置"
+            logger.exception("Provider 创建失败（配置可能非法）：provider=%s", config.get("provider"))
             return None
         setattr(self, f"_{slot}", provider)
         setattr(self, f"_{slot}_sig", sig)

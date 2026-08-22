@@ -163,7 +163,7 @@ function editStudent(id) {
 function deleteStudentConfirm(id) {
     Utils.confirmDialog({
         title: '删除学生',
-        message: '确定删除该学生？<br>该生的所有学科、报告、成绩、规划等数据将被<b>永久删除</b>，且不可恢复！',
+        messageHtml: '确定删除该学生？<br>该生的所有学科、报告、成绩、规划等数据将被<b>永久删除</b>，且不可恢复！',
         danger: true,
         onOk: async () => {
             try {

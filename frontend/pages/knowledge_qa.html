@@ -129,8 +129,8 @@ async function sendQuestion(question) {
     if (!q) return;
     qaHistory.push({ role: 'user', content: q });
     const chat = document.getElementById('qa-chat');
-    // 清空初始提示
-    const empty = chat.querySelector('.text-center');
+    // 清空初始提示（初始占位是 .empty-state，此前选择器写错导致提示一直悬浮在顶部）
+    const empty = chat.querySelector('.empty-state');
     if (empty) empty.remove();
     chat.innerHTML += userBubble(q) + aiLoadingBubble();
     input.value = '';

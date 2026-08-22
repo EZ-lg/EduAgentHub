@@ -159,7 +159,7 @@ function renderClassSection(ov) {
         const schedHtml = c.term_type === 'summer_winter'
             ? `<div class="text-xs text-gray-400 mt-1">每天 ${esc(c.daily_start)}-${esc(c.daily_end)} · 共 ${c.total_lessons} 天 · ${esc(c.start_date || '?')}~${esc(c.end_date || '?')}</div>`
             : (c.schedules && c.schedules.length
-                ? `<div class="flex flex-wrap gap-1 mt-1.5">${c.schedules.map(s => `<span class="badge badge--info">${s.weekday_label} ${s.start_time}-${s.end_time}</span>`).join('')}</div>`
+                ? `<div class="flex flex-wrap gap-1 mt-1.5">${c.schedules.map(s => `<span class="badge badge--info">${esc(s.weekday_label)} ${esc(s.start_time)}-${esc(s.end_time)}</span>`).join('')}</div>`
                 : '<div class="text-xs text-gray-400 mt-1">尚未排课 · <a class="text-indigo-500" href="#/classes/' + c.id + '" onclick="event.stopPropagation()">去排课</a></div>');
         return `<div class="flex items-center justify-between gap-3 py-2.5 border-b cursor-pointer hover:bg-gray-50 rounded px-1.5 -mx-1.5 transition" style="border-color:var(--border-soft);" onclick="location.hash='#/classes/${c.id}'">
             <div class="min-w-0 flex-1">
@@ -210,7 +210,7 @@ function editStudentInfo() {
 function deleteStudent() {
     Utils.confirmDialog({
         title: '删除学生',
-        message: '确定删除该学生？<br>该生的所有学科、报告、成绩、规划等数据将被<b>永久删除</b>，且不可恢复！',
+        messageHtml: '确定删除该学生？<br>该生的所有学科、报告、成绩、规划等数据将被<b>永久删除</b>，且不可恢复！',
         danger: true,
         onOk: async () => {
             try {
@@ -447,6 +447,7 @@ async function deleteReport(reportId) {
 
 /* ---------- 档案 AI 助手 ---------- */
 let studentChatHistory = [];   // [{role: 'user'|'ai', content}]
+let studentChatBusy = false;   // AI 回复期间防重复发送（Enter 连发会多发一次请求 + 占位符错位）
 
 function studentChatHtml(messages) {
     const bubbles = messages.map(m => {
@@ -489,8 +490,10 @@ function openStudentChat() {
 }
 
 async function sendStudentChat(input) {
+    if (studentChatBusy) return;   // 请求未返回时忽略再次发送
     const text = (input && input.value.trim()) || '';
     if (!text) return;
+    studentChatBusy = true;
     const sendBtn = document.getElementById('student-chat-send');
     if (sendBtn) sendBtn.disabled = true;
     input.value = '';
@@ -510,6 +513,7 @@ async function sendStudentChat(input) {
         renderStudentChat();
         showToast('AI 回复失败：' + e.message, 'error');
     } finally {
+        studentChatBusy = false;
         const btn = document.getElementById('student-chat-send');
         if (btn) btn.disabled = false;
     }
@@ -602,7 +606,8 @@ async function renderScoresTab() {
     const box = document.getElementById('subject-tab-content');
     if (!box) return;
     box.innerHTML = '<p class="text-gray-300 text-center py-10">加载中...</p>';
-    goalPercent = null;
+    // 注意：不再在此重置 goalPercent —— AI 分析画出的目标参考线在录入/删除成绩、切 Tab 后应保留；
+    // 仅在切换学科时重置（见 onSubjectHashChange）
     try {
         const r = await API.scores.list(currentSubjectId);
         scoresList = (r.success && r.data) ? r.data : [];
@@ -627,8 +632,8 @@ function buildScoresHtml() {
                     ${scoresList.length < 2 ? '<span class="text-xs text-gray-400 self-center">少于 2 次成绩时趋势参考有限</span>' : ''}
                 </div>
                 <div class="flex gap-1">
-                    <button data-chart-mode="percent" onclick="setScoreChartMode('percent')" class="btn-primary" style="padding:5px 12px;font-size:12px;">百分制</button>
-                    <button data-chart-mode="raw" onclick="setScoreChartMode('raw')" class="btn-outline" style="padding:5px 12px;font-size:12px;">原始分</button>
+                    <button data-chart-mode="percent" onclick="setScoreChartMode('percent')" class="${scoreChartMode === 'percent' ? 'btn-primary' : 'btn-outline'}" style="padding:5px 12px;font-size:12px;">百分制</button>
+                    <button data-chart-mode="raw" onclick="setScoreChartMode('raw')" class="${scoreChartMode === 'raw' ? 'btn-primary' : 'btn-outline'}" style="padding:5px 12px;font-size:12px;">原始分</button>
                 </div>
             </div>
             ${chartBody}
@@ -1349,6 +1354,7 @@ function onSubjectHashChange() {
     const sid = parseInt(parts[4]);
     if (!sid || sid === currentSubjectId) return;
     currentSubjectId = sid;
+    goalPercent = null;   // 切换学科后重置目标参考线（避免上一学科的线带到新学科）
     if (overviewData && Array.isArray(overviewData.subjects)) renderSubjectCards(overviewData);  // 移动学科卡高亮
     document.getElementById('subject-detail-area').classList.remove('hidden');
     document.getElementById('back-to-overview').classList.remove('hidden');
