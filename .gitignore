@@ -9,6 +9,7 @@ dist/
 build/*
 !build/tailwind-input.css
 !build/build.spec
+!build/icon.ico
 !build_tailwind.py
 *.spec
 !build/build.spec

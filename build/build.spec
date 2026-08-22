@@ -93,6 +93,7 @@ exe = EXE(
     a.datas,
     [],
     name='TutoringAgent',
+    icon=os.path.join(PROJECT_ROOT, 'build', 'icon.ico'),  # 商用品牌图标（多尺寸 ico）
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
