@@ -204,7 +204,7 @@ function editStudentInfo() {
                 } catch (e) { showToast('保存失败：' + e.message, 'error'); }
             },
         });
-    });
+    }).catch(e => showToast('加载学生信息失败：' + e.message, 'error'));
 }
 
 function deleteStudent() {

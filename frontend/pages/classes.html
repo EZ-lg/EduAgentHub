@@ -136,7 +136,8 @@ async function loadBaseData() {
         const [t, c, s] = await Promise.all([
             API.teachers.list(),
             API.classrooms.list(),
-            API.students.list(),
+            // 取全部学生（默认分页 20，>20 人的机构会漏掉后面的学生，无法加入班级）
+            API.students.list({ page: 1, page_size: 10000 }),
         ]);
         teacherList = (t.success && t.data) ? t.data : [];
         classroomList = (c.success && c.data) ? c.data : [];
@@ -400,9 +401,13 @@ function showClassModal(id) {
             sw_start_date: values.start_date || '',
         },
         onSubmit: async (data) => {
-            // 一对几 → 存 class_type（"1v" + N）
+            // 一对几 → 存 class_type（"1v" + N）；须为 ≥1 的整数，防 1.5/负数 存成非法班型
             const pn = Number(data.pair_num);
-            data.class_type = pn >= 1 ? '1v' + pn : '1vN';
+            if (!Number.isInteger(pn) || pn < 1) {
+                showToast('班型人数需为 ≥1 的整数', 'error');
+                return;
+            }
+            data.class_type = '1v' + pn;
             delete data.pair_num;
             data.teacher_id = data.teacher_id ? Number(data.teacher_id) : null;
             data.classroom_id = data.classroom_id ? Number(data.classroom_id) : null;

@@ -91,7 +91,7 @@
                         <button class="btn-outline" onclick="testEmbed()"><svg class="icon icon--md"><use href="#icon-plug"/></svg> 测试连接</button>
                         <button class="btn-primary" onclick="saveEmbed()"><svg class="icon icon--md"><use href="#icon-save"/></svg> 保存配置</button>
                     </div>
-                    <div class="text-xs text-amber-500/80 inline-flex items-center gap-1"><svg class="icon icon--sm"><use href="#icon-alert-triangle"/></svg> 切换 Embedding 模型后，需在「知识库」重新入库向量（P8 实现）</div>
+                    <div class="text-xs text-amber-500/80 inline-flex items-center gap-1"><svg class="icon icon--sm"><use href="#icon-alert-triangle"/></svg> 切换 Embedding 模型后，需在「知识库」页重新入库向量</div>
                     <div id="emb-test-result" class="text-sm"></div>
                 </div>
             </div>
@@ -173,20 +173,47 @@
 
     <!-- ============ 数据管理 ============ -->
     <div id="settings-tab-data" class="settings-tab-panel hidden">
+        <!-- 系统健康 -->
         <div class="panel">
-            <div class="panel-title"><svg class="icon"><use href="#icon-database"/></svg> 数据管理 <span class="text-xs font-normal text-gray-400">数据库自动备份</span></div>
-            <div class="mb-4 p-3 rounded-lg text-xs bg-indigo-50 text-indigo-600 border border-indigo-100 inline-flex items-start gap-1.5">
-                <svg class="icon icon--sm flex-shrink-0 mt-0.5"><use href="#icon-shield-check"/></svg>
-                每次启动时自动备份数据库（保留最近 14 份），防止误删不可恢复。
+            <div class="flex items-center justify-between mb-3">
+                <div class="panel-title"><svg class="icon"><use href="#icon-shield-check"/></svg> 系统健康 <span class="text-xs font-normal text-gray-400">数据库完整性自检</span></div>
+                <button onclick="loadHealth()" class="btn-outline" style="padding:6px 14px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-refresh-cw"/></svg> 重新检测</button>
             </div>
-            <div class="flex items-center gap-2 mb-3">
-                <button onclick="backupNow()" class="btn-primary" style="padding:6px 16px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-save"/></svg> 立即备份</button>
+            <div id="health-box" class="text-center py-4 text-gray-400 text-sm">检测中...</div>
+        </div>
+
+        <!-- 备份管理 -->
+        <div class="panel">
+            <div class="panel-title"><svg class="icon"><use href="#icon-database"/></svg> 备份管理 <span class="text-xs font-normal text-gray-400">数据库 + 上传资料</span></div>
+            <div class="mb-4 p-3 rounded-lg text-xs bg-indigo-50 text-indigo-600 border border-indigo-100 inline-flex items-start gap-1.5">
+                <svg class="icon icon--sm flex-shrink-0 mt-0.5"><use href="#icon-info"/></svg>
+                每次启动自动备份数据库（保留最近 14 份）。「完整备份」额外包含上传资料与知识库，建议重要时点手动执行。
+            </div>
+            <div class="flex items-center gap-2 mb-3 flex-wrap">
+                <button onclick="backupNow(false)" class="btn-primary" style="padding:6px 16px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-save"/></svg> 立即备份</button>
+                <button onclick="backupNow(true)" class="btn-outline" style="padding:6px 16px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-database"/></svg> 完整备份</button>
                 <button onclick="loadBackups()" class="btn-outline" style="padding:6px 16px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-refresh-cw"/></svg> 刷新</button>
             </div>
             <div id="backup-list" class="text-center py-8 text-gray-300 text-sm">加载中...</div>
+        </div>
+
+        <!-- 换机迁移 -->
+        <div class="panel">
+            <div class="panel-title"><svg class="icon"><use href="#icon-download"/></svg> 换机迁移 <span class="text-xs font-normal text-gray-400">导出/导入完整数据包</span></div>
+            <div class="mb-4 p-3 rounded-lg text-xs bg-indigo-50 text-indigo-600 border border-indigo-100 inline-flex items-start gap-1.5">
+                <svg class="icon icon--sm flex-shrink-0 mt-0.5"><use href="#icon-info"/></svg>
+                换电脑时：旧机「导出数据包」→ 新机安装后「导入数据包」，全部档案/成绩/资料/知识库完整迁移。
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <button onclick="exportMigration()" class="btn-primary" style="padding:6px 16px;font-size:13px;"><svg class="icon icon--md"><use href="#icon-download"/></svg> 导出数据包</button>
+                <label class="btn-outline cursor-pointer" style="padding:6px 16px;font-size:13px;">
+                    <svg class="icon icon--md"><use href="#icon-upload-cloud"/></svg> 导入数据包
+                    <input type="file" accept=".zip" class="hidden" onchange="importMigration(this)">
+                </label>
+            </div>
             <div class="text-xs text-gray-300 mt-3 leading-relaxed">
                 备份文件保存在 <code class="text-gray-400">data/backups/</code> 目录。<br>
-                如需恢复：关闭程序 → 用备份文件替换 <code class="text-gray-400">data/tutoring.db</code> → 重新启动。
+                升级/换机须保留 <code class="text-gray-400">data/</code> 文件夹，数据 100% 本地不丢失。
             </div>
         </div>
     </div>
@@ -202,7 +229,7 @@
             </div>
             <div class="mb-3 p-3 rounded-lg text-xs bg-indigo-50 text-indigo-600 border border-indigo-100 inline-flex items-start gap-1.5">
                 <svg class="icon icon--sm flex-shrink-0 mt-0.5"><use href="#icon-info"/></svg>
-                教室是智能排课（P3）的硬资源：同一教室同一时段只能上一门课。容量建议 ≥ 班级人数。
+                教室是智能排课的硬资源：同一教室同一时段只能上一门课。容量建议 ≥ 班级人数。
             </div>
             <div id="classrooms-list" class="text-center py-8 text-gray-300 text-sm">加载中...</div>
         </div>
@@ -215,7 +242,6 @@
             <div class="text-center py-8">
                 <div class="empty-icon mx-auto mb-3"><svg class="icon"><use href="#icon-book-open"/></svg></div>
                 <div class="text-lg font-bold text-gray-800">教培智能体</div>
-                <div class="text-xs text-gray-400 mt-1">v1.0.0 · P9 全功能版</div>
                 <div class="text-xs text-gray-300 mt-4 leading-relaxed">
                     教培机构一站式学员管理及 AI 助学工具<br>
                     FastAPI + SQLite + ChromaDB + Vue 3 · 本地运行，数据不出电脑<br>
@@ -270,6 +296,7 @@ async function initSettings() {
         if (el) el.addEventListener('input', updateOrgPreview);
     });
     loadBackups();
+    loadHealth();
 }
 
 async function loadSavedConfig() {
@@ -404,22 +431,22 @@ function renderTestResult(box, res) {
 /* ---------- 保存配置 ---------- */
 async function saveLLM() {
     const cfg = gatherLLM();
-    if (!cfg.provider) { alert('请先选择提供商'); return; }
+    if (!cfg.provider) { showToast('请先选择提供商', 'error'); return; }
     try {
         const r = await API.settings.update({ llm_config: cfg });
         if (r.success) { showToast('LLM 配置已保存', 'success'); }
-        else alert('保存失败：' + (r.error || '未知错误'));
-    } catch (e) { alert('保存失败：' + e.message); }
+        else showToast('保存失败：' + (r.error || '未知错误'), 'error');
+    } catch (e) { showToast('保存失败：' + e.message, 'error'); }
 }
 
 async function saveEmbed() {
     const cfg = gatherEmb();
-    if (!cfg.provider) { alert('请先选择提供商'); return; }
+    if (!cfg.provider) { showToast('请先选择提供商', 'error'); return; }
     try {
         const r = await API.settings.update({ embedding_config: cfg });
         if (r.success) { showToast('Embedding 配置已保存', 'success'); }
-        else alert('保存失败：' + (r.error || '未知错误'));
-    } catch (e) { alert('保存失败：' + e.message); }
+        else showToast('保存失败：' + (r.error || '未知错误'), 'error');
+    } catch (e) { showToast('保存失败：' + e.message, 'error'); }
 }
 
 /* ---------- 机构信息 ---------- */
@@ -508,7 +535,36 @@ async function saveOrg() {
     } catch (e) { showToast('保存失败：' + e.message, 'error'); }
 }
 
-/* ---------- 数据备份 ---------- */
+/* ---------- 系统健康（P0 数据可靠性） ---------- */
+async function loadHealth() {
+    const box = document.getElementById('health-box');
+    if (!box) return;
+    box.innerHTML = '<div class="text-gray-400 text-sm">检测中...</div>';
+    try {
+        const r = await API.settings.health();
+        const d = (r.success && r.data) ? r.data : null;
+        if (!d) { box.innerHTML = '<div class="text-red-400 text-sm">无法获取健康状态</div>'; return; }
+        const badge = d.healthy
+            ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-emerald-50 text-emerald-600 border border-emerald-100"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>正常</span>'
+            : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-50 text-red-600 border border-red-100"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>异常</span>';
+        const repairLine = d.last_repair
+            ? `<div class="text-xs text-amber-600 mt-1">最近修复：${Utils.escapeHtml(d.last_repair_message || '')}</div>`
+            : '';
+        box.innerHTML = `
+            <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+                ${badge}
+                <span class="text-gray-500">自检：${Utils.escapeHtml(String(d.quick_check || '未知'))}</span>
+                <span class="text-gray-500">表结构：${d.tables_ok ? '完整' : '异常'}</span>
+                <span class="text-gray-500">备份：${d.backup_count || 0} 份</span>
+                <span class="text-gray-500">最近备份：${Utils.escapeHtml(d.last_backup_at || '—')}</span>
+            </div>
+            ${repairLine}`;
+    } catch (e) {
+        box.innerHTML = `<div class="text-red-400 text-sm">检测失败：${Utils.escapeHtml(e.message)}</div>`;
+    }
+}
+
+/* ---------- 备份管理 ---------- */
 async function loadBackups() {
     const box = document.getElementById('backup-list');
     if (!box) return;
@@ -520,22 +576,119 @@ async function loadBackups() {
             box.innerHTML = '<div class="text-gray-300 text-sm">暂无备份（每次启动自动生成）</div>';
             return;
         }
-        box.innerHTML = `<div class="divide-y" style="border-color:var(--border-soft);">` + list.map(b => `
-            <div class="flex items-center justify-between py-2">
-                <span class="text-sm text-gray-700 num">${Utils.escapeHtml(b.filename)}</span>
-                <span class="text-xs text-gray-400 num">${(b.size / 1024).toFixed(0)} KB · ${b.created_at}</span>
-            </div>`).join('') + `</div>`;
+        box.innerHTML = `<div class="divide-y" style="border-color:var(--border-soft);">` + list.map(b => {
+            const typeBadge = b.type === 'full'
+                ? '<span class="px-1.5 py-0.5 rounded text-[10px] bg-amber-50 text-amber-600 border border-amber-100">完整</span>'
+                : '<span class="px-1.5 py-0.5 rounded text-[10px] bg-sky-50 text-sky-600 border border-sky-100">数据库</span>';
+            return `
+            <div class="flex items-center justify-between py-2 flex-wrap gap-2">
+                <div class="flex items-center gap-2 min-w-0">
+                    ${typeBadge}
+                    <span class="text-sm text-gray-700 num truncate">${Utils.escapeHtml(b.filename)}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-400 num">${(b.size / 1024 / 1024).toFixed(2)} MB · ${Utils.escapeHtml(b.created_at)}</span>
+                    <button onclick="downloadBackup('${encodeURIComponent(b.filename)}')" class="btn-outline" style="padding:3px 10px;font-size:12px;">下载</button>
+                    <button onclick="restoreBackup('${encodeURIComponent(b.filename)}')" class="btn-outline" style="padding:3px 10px;font-size:12px;">恢复</button>
+                    <button onclick="deleteBackup('${encodeURIComponent(b.filename)}')" class="btn-outline" style="padding:3px 10px;font-size:12px;color:#ef4444;">删除</button>
+                </div>
+            </div>`;
+        }).join('') + `</div>`;
     } catch (e) {
         box.innerHTML = `<div class="text-red-400 text-sm">加载失败：${Utils.escapeHtml(e.message)}</div>`;
     }
 }
 
-async function backupNow() {
+async function backupNow(full) {
     try {
-        const r = await API.settings.backup();
-        if (r.success) { showToast('备份完成', 'success'); loadBackups(); }
+        const r = full ? await API.settings.backupFull() : await API.settings.backup();
+        if (r.success) { showToast(full ? '完整备份完成' : '备份完成', 'success'); loadBackups(); }
         else showToast('备份失败：' + (r.error || ''), 'error');
     } catch (e) { showToast('备份失败：' + e.message, 'error'); }
+}
+
+function downloadBackup(enc) {
+    const filename = decodeURIComponent(enc);
+    window.open(API.settings.downloadUrl(filename), '_blank');
+}
+
+function restoreBackup(enc) {
+    const filename = decodeURIComponent(enc);
+    Utils.confirmDialog({
+        title: '恢复备份',
+        messageHtml: `<div class="text-sm text-gray-500 leading-relaxed">
+            确定从备份 <code class="text-gray-600">${Utils.escapeHtml(filename)}</code> 恢复？
+            <div class="mt-2 text-amber-600">恢复会覆盖当前数据（系统会自动保留一份反悔快照）。恢复过程中请勿操作其他页面。</div>
+        </div>`,
+        danger: true,
+        onOk: async () => {
+            showToast('正在恢复...', 'info');
+            try {
+                const r = await API.settings.restoreBackup(filename);
+                if (r.success) {
+                    showToast('恢复成功', 'success');
+                    loadBackups();
+                    loadHealth();
+                } else showToast('恢复失败：' + (r.error || ''), 'error');
+            } catch (e) { showToast('恢复失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+function deleteBackup(enc) {
+    const filename = decodeURIComponent(enc);
+    Utils.confirmDialog({
+        title: '删除备份',
+        message: `确定删除备份 ${filename}？此操作不可恢复。`,
+        danger: true,
+        onOk: async () => {
+            try {
+                const r = await API.settings.deleteBackup(filename);
+                if (r.success) { showToast('已删除', 'success'); loadBackups(); }
+                else showToast('删除失败：' + (r.error || ''), 'error');
+            } catch (e) { showToast('删除失败：' + e.message, 'error'); }
+        },
+    });
+}
+
+/* ---------- 换机迁移 ---------- */
+async function exportMigration() {
+    showToast('正在打包数据，请稍候...', 'info');
+    try {
+        const r = await API.settings.exportMigration();
+        if (r.success && r.data && r.data.filename) {
+            showToast('数据包已生成，开始下载', 'success');
+            window.open(API.settings.downloadUrl(r.data.filename), '_blank');
+        } else showToast('导出失败：' + (r.error || ''), 'error');
+    } catch (e) { showToast('导出失败：' + e.message, 'error'); }
+}
+
+function importMigration(input) {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.zip')) { showToast('请选择 .zip 数据包', 'error'); return; }
+    Utils.confirmDialog({
+        title: '导入数据包',
+        messageHtml: `<div class="text-sm text-gray-500 leading-relaxed">
+            确定导入数据包 <code class="text-gray-600">${Utils.escapeHtml(file.name)}</code>？
+            <div class="mt-2 text-amber-600">导入将覆盖当前全部数据（系统会自动保留反悔快照），换机迁移请确认目标为新安装的机器。</div>
+        </div>`,
+        danger: true,
+        onOk: async () => {
+            showToast('正在导入，请勿关闭页面...', 'info');
+            try {
+                const fd = new FormData();
+                fd.append('file', file);
+                const r = await API.settings.importMigration(fd);
+                if (r.success) {
+                    showToast('导入成功', 'success');
+                    loadBackups();
+                    loadHealth();
+                } else showToast('导入失败：' + (r.error || ''), 'error');
+            } catch (e) { showToast('导入失败：' + e.message, 'error'); }
+        },
+    });
 }
 
 /* ---------- 教室管理 ---------- */
@@ -641,7 +794,8 @@ Object.assign(window, {
     saveLLM, saveEmbed, testLLM, testEmbed,
     switchSettingsTab, toggleKey, onLLMProviderChange, onEmbProviderChange,
     saveOrg, handleOrgLogo, clearOrgLogo, loadOrg,
-    loadBackups, backupNow,
+    loadBackups, backupNow, loadHealth, downloadBackup, restoreBackup, deleteBackup,
+    exportMigration, importMigration,
     loadClassrooms, showClassroomModal, deleteClassroom,
 });
 })();

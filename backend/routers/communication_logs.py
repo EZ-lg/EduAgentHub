@@ -23,6 +23,9 @@ def list_logs(subject_id: int, db: Session = Depends(get_db)):
 @router.post("/subjects/{subject_id}/communication-logs")
 def create_log(subject_id: int, data: dict, db: Session = Depends(get_db)):
     """新增日志"""
+    from backend.models.subject import Subject
+    if not db.query(Subject).filter(Subject.id == subject_id).first():
+        raise HTTPException(status_code=404, detail="学科不存在")
     log = CommunicationLog(
         subject_id=subject_id,
         method=data.get("method", "面谈"),

@@ -5,11 +5,13 @@ window.API = {
     BASE: '',
 
     async request(url, options = {}) {
+        const isForm = options.body instanceof FormData;
         const config = {
-            headers: { 'Content-Type': 'application/json' },
+            headers: isForm ? {} : { 'Content-Type': 'application/json' },
             ...options,
         };
-        if (config.body && typeof config.body === 'object') {
+        // FormData 交给 fetch 自动设置 multipart boundary，不 JSON 序列化
+        if (config.body && typeof config.body === 'object' && !(config.body instanceof FormData)) {
             config.body = JSON.stringify(config.body);
         }
         try {
@@ -112,7 +114,7 @@ window.API = {
 
     // === 教师 ===
     teachers: {
-        list(search = '') { return API.get(`/api/teachers?search=${search}`); },
+        list(search = '') { return API.get(`/api/teachers?search=${encodeURIComponent(search)}`); },
         create(data) { return API.post('/api/teachers', data); },
         update(id, data) { return API.put(`/api/teachers/${id}`, data); },
         delete(id) { return API.delete(`/api/teachers/${id}`); },
@@ -205,8 +207,16 @@ window.API = {
         update(data) { return API.put('/api/settings', data); },
         testLLM(data) { return API.post('/api/settings/test-llm', data || {}); },
         testEmbed(data) { return API.post('/api/settings/test-embed', data || {}); },
+        // P0 数据可靠性
         backup() { return API.post('/api/settings/backup'); },
+        backupFull() { return API.post('/api/settings/backup?full=true'); },
         backupsList() { return API.get('/api/settings/backups'); },
+        health() { return API.get('/api/settings/health'); },
+        restoreBackup(filename) { return API.post('/api/settings/backups/restore', { filename }); },
+        deleteBackup(filename) { return API.delete('/api/settings/backups/' + encodeURIComponent(filename)); },
+        downloadUrl(filename) { return '/api/settings/backups/' + encodeURIComponent(filename) + '/download'; },
+        exportMigration() { return API.post('/api/settings/migrate/export'); },
+        importMigration(formData) { return API.post('/api/settings/migrate/import', formData); },
     },
 
     // === 工作台 ===

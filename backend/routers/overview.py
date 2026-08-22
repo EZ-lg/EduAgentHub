@@ -360,7 +360,15 @@ def student_overview(student_id: int, db: Session = Depends(get_db)):
                     rows = []
             except (json.JSONDecodeError, TypeError):
                 rows = []
-            hours = sum(int(r.get("hours") or 0) for r in rows if isinstance(r, dict))
+            # hours 可能是 LLM 返回的字符串（"1.5"）或缺失，安全转换避免 int("1.5") 崩 500
+            hours = 0
+            for r in rows:
+                if not isinstance(r, dict):
+                    continue
+                try:
+                    hours += float(r.get("hours") or 0)
+                except (TypeError, ValueError):
+                    pass
             card["plan"] = {
                 "version": plan.version,
                 "lesson_count": len(rows),

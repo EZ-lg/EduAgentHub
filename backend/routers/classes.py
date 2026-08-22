@@ -44,6 +44,10 @@ def _to_int(value, default=0):
         return default
 
 
+# 总课次上限：防止 total_lessons 填超大值导致 compute_end_date 死循环卡死请求
+MAX_TOTAL_LESSONS = 1000
+
+
 def _class_detail(db: Session, cls: Class) -> dict:
     """班级详情：基础信息 + 人数 + 关联名称（教师/教室/学科）+ 学生列表"""
     d = cls.to_dict()
@@ -106,6 +110,8 @@ def create_class(data: dict, db: Session = Depends(get_db)):
     if term_type not in ("semester", "summer_winter"):
         raise HTTPException(status_code=400, detail="班型应为 semester（学期）或 summer_winter（寒暑假）")
     total_lessons = _to_int(data.get("total_lessons"))
+    if total_lessons > MAX_TOTAL_LESSONS:
+        raise HTTPException(status_code=400, detail=f"总课次不能超过 {MAX_TOTAL_LESSONS}")
     daily_start = data.get("daily_start", "")
     daily_end = data.get("daily_end", "")
 
@@ -331,11 +337,16 @@ def extend_class(class_id: int, data: dict, db: Session = Depends(get_db)):
     if cls.term_type != "summer_winter":
         raise HTTPException(status_code=400, detail="仅寒暑假班支持续课")
 
-    new_total = int(data.get("new_total") or data.get("total_lessons") or 0)
+    new_total = _to_int(data.get("new_total") or data.get("total_lessons") or 0)
     if new_total <= cls.total_lessons:
         return success_response({
             "extended": False,
             "message": f"续课后总课次需大于当前 {cls.total_lessons} 天（当前结束 {cls.end_date}）",
+        })
+    if new_total > MAX_TOTAL_LESSONS:
+        return success_response({
+            "extended": False,
+            "message": f"总课次不能超过 {MAX_TOTAL_LESSONS}",
         })
 
     # 模拟续课：更新 total_lessons/end_date 后做班期冲突校验

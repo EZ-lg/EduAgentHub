@@ -12,6 +12,14 @@ from backend.utils.helpers import success_response, now_iso
 router = APIRouter(prefix="/api/classrooms", tags=["classrooms"])
 
 
+def _to_int(value, default=0):
+    """安全转 int：非数字/非法返回 default（防 capacity 存成字符串导致排课比较 TypeError）"""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 @router.get("")
 def list_classrooms(status: str = "", db: Session = Depends(get_db)):
     """教室列表（可按状态筛选 active/paused）"""
@@ -25,9 +33,12 @@ def list_classrooms(status: str = "", db: Session = Depends(get_db)):
 @router.post("")
 def create_classroom(data: dict, db: Session = Depends(get_db)):
     """新建教室"""
+    capacity = _to_int(data.get("capacity"), 10)
+    if capacity < 0:
+        raise HTTPException(status_code=400, detail="教室容量不能为负")
     classroom = Classroom(
         name=data.get("name", ""),
-        capacity=data.get("capacity", 10),
+        capacity=capacity,
         location=data.get("location", ""),
         notes=data.get("notes", ""),
         status=data.get("status", "active"),
@@ -48,9 +59,11 @@ def update_classroom(classroom_id: int, data: dict, db: Session = Depends(get_db
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(status_code=404, detail="教室不存在")
-    for field in ["name", "capacity", "location", "notes", "status"]:
+    for field in ["name", "location", "notes", "status"]:
         if field in data and data[field] is not None:
             setattr(classroom, field, data[field])
+    if "capacity" in data and data["capacity"] is not None:
+        classroom.capacity = _to_int(data["capacity"], classroom.capacity)
     classroom.updated_at = now_iso()
     log_activity(db, "编辑教室", f"教室「{classroom.name}」")
     db.commit()

@@ -64,12 +64,17 @@ window.Utils = {
     },
 
     /**
-     * HTML 转义
+     * HTML 转义：文本位与双引号属性位共用。
+     * 手动 replace 而非 div.textContent 技巧——后者不转义引号，
+     * 会让 title="${esc(...)}" 这类属性注入（值含 " 即逃逸）形成存储型 XSS。
      */
     escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+        if (str === null || str === undefined) return '';  // 避免渲染出 "null"/"undefined"
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
     },
 
     /**
@@ -102,6 +107,15 @@ window.Utils = {
         panel.style.width = width + 'px';
         mask.appendChild(panel);
         document.body.appendChild(mask);
+        // mask 级监听只在此绑定一次：render()/attach() 会多次调用，若放 attach 内会累积
+        // 监听导致 Enter 双提交（重复建班）。close 是函数声明（hoisted），此处引用安全。
+        mask.addEventListener('mousedown', (e) => { if (e.target === mask) close(); });
+        mask.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                // hideOk 弹窗（版本历史/预览等）没有 [data-ok]，需判空
+                mask.querySelector('[data-ok]')?.click();
+            }
+        });
 
         // 初始值（含 default）
         const initial = {};
@@ -210,8 +224,8 @@ window.Utils = {
         }
 
         function attach() {
+            // mask 级 mousedown/keydown 监听在 showModal 创建时已绑定一次（避免累积双提交），此处不再重复
             mask.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', close));
-            mask.addEventListener('mousedown', (e) => { if (e.target === mask) close(); });
             // 联动重渲染：renderOn 中的 key 变化时重建表单（保留其它字段已填值）
             for (const key of renderOn) {
                 const el = mask.querySelector(`[data-key="${key}"]`);
@@ -230,12 +244,6 @@ window.Utils = {
                 }
                 close();
                 if (onSubmit) onSubmit(result);
-            });
-            mask.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
-                    // hideOk 弹窗（版本历史/预览等）没有 [data-ok]，需判空
-                    mask.querySelector('[data-ok]')?.click();
-                }
             });
             const first = mask.querySelector('input,select,textarea');
             if (first) setTimeout(() => first.focus(), 50);

@@ -23,6 +23,11 @@ data/uploads/*
 data/exports/*
 !data/uploads/.gitkeep
 !data/exports/.gitkeep
+# P0 数据可靠性运行时（日志/损坏留证/临时快照/启动失败标记）
+data/logs/
+data/quarantine/
+data/.backup_tmp/
+data/startup_failed.txt
 
 # OS
 Thumbs.db

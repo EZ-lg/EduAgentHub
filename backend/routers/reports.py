@@ -60,7 +60,12 @@ def update_report(report_id: int, data: dict, db: Session = Depends(get_db)):
         report.status = data["status"]
     if "course_plan_id" in data:
         # 指向最新课程规划版本（P6：报告页/规划Tab保存新版本后同步）
-        report.course_plan_id = data["course_plan_id"] if data["course_plan_id"] is not None else None
+        cpid = data["course_plan_id"]
+        if cpid is not None:
+            from backend.models.course_plan import CoursePlan
+            if not db.query(CoursePlan).filter(CoursePlan.id == cpid).first():
+                raise HTTPException(status_code=400, detail="课程规划不存在")
+        report.course_plan_id = cpid if cpid is not None else None
     report.updated_at = now_iso()
     log_activity(db, "编辑报告", f"报告「{report.title}」", subject_id=report.subject_id)
     db.commit()

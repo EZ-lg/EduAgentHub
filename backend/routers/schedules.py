@@ -54,6 +54,15 @@ def _validate_time_range(start: str, end: str):
         raise HTTPException(status_code=400, detail="结束时间需晚于开始时间")
 
 
+def _to_weekday(value, default=0) -> int:
+    """安全转 weekday 并钳制到 0-6（非法输入回退 default），避免 int() 抛 500"""
+    try:
+        v = int(value)
+    except (TypeError, ValueError):
+        return default
+    return v if 0 <= v <= 6 else default
+
+
 def _enrich_conflicts(db, conflicts, weekday=None, start=None, end=None):
     """给冲突列表补全信息：冲突班级名 + 具体时间，让前端明确提示「哪一天哪节课和哪个班冲突」"""
     out = []
@@ -332,6 +341,11 @@ def auto_plan(data: dict, db: Session = Depends(get_db)):
     weekdays = data.get("weekdays")
     if weekdays is None:
         weekdays = list(range(7))
+    else:
+        # 只接受 0-6 的整数，非法值过滤，防止生成无效 weekday 落库后冲突检测被静默绕过
+        weekdays = [d for d in weekdays if isinstance(d, int) and 0 <= d <= 6]
+        if not weekdays:
+            raise HTTPException(status_code=400, detail="weekdays 应为 0-6 的整数")
 
     classes = _build_classes(db, class_ids)
     if not classes:
@@ -386,7 +400,7 @@ def confirm_plan(data: dict, db: Session = Depends(get_db)):
     for it in items:
         new_items.append({
             "class_id": class_id,
-            "weekday": int(it["weekday"]),
+            "weekday": _to_weekday(it["weekday"]),
             "start_time": it["start_time"],
             "end_time": it["end_time"],
             "classroom_id": it.get("classroom_id"),
@@ -413,10 +427,11 @@ def confirm_plan(data: dict, db: Session = Depends(get_db)):
         return success_response({"confirmed": False, "conflicts": _enrich_conflicts(db, conflicts),
                                  "message": "存在时间冲突，请调整后再确认"})
 
-    # 该班旧 active 课次 → archived
+    # 该班旧"周循环"active 课次 → archived（临时调课 date 非空保留，教务手工排的课不抹掉）
     db.query(ClassSchedule).filter(
         ClassSchedule.class_id == class_id,
         ClassSchedule.status == "active",
+        ClassSchedule.date == "",
     ).update({"status": "archived"})
 
     for it in new_items:
@@ -442,7 +457,7 @@ def check_conflicts(data: dict, db: Session = Depends(get_db)):
     for it in items:
         built.append({
             "class_id": it.get("class_id"),
-            "weekday": int(it.get("weekday", 0)),
+            "weekday": _to_weekday(it.get("weekday", 0)),
             "start_time": it.get("start_time", ""),
             "end_time": it.get("end_time", ""),
             "classroom_id": it.get("classroom_id"),
@@ -525,9 +540,15 @@ def add_schedule(data: dict, db: Session = Depends(get_db)):
     if not cls:
         raise HTTPException(status_code=404, detail="班级不存在")
     _validate_time_range(data.get("start_time", ""), data.get("end_time", ""))
+    try:
+        weekday = int(data.get("weekday", 0))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="weekday 应为 0-6 的整数")
+    if not 0 <= weekday <= 6:
+        raise HTTPException(status_code=400, detail="weekday 应为 0-6 的整数")
     new_item = {
         "class_id": class_id,
-        "weekday": int(data.get("weekday", 0)),
+        "weekday": weekday,
         "start_time": data.get("start_time", ""),
         "end_time": data.get("end_time", ""),
         "classroom_id": data.get("classroom_id"),
@@ -566,7 +587,13 @@ def update_schedule(schedule_id: int, data: dict, db: Session = Depends(get_db))
     if not sched:
         raise HTTPException(status_code=404, detail="课次不存在")
     if "weekday" in data:
-        sched.weekday = int(data["weekday"])
+        try:
+            wd = int(data["weekday"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="weekday 应为 0-6 的整数")
+        if not 0 <= wd <= 6:
+            raise HTTPException(status_code=400, detail="weekday 应为 0-6 的整数")
+        sched.weekday = wd
     for f in ["start_time", "end_time", "classroom_id", "teacher_id"]:
         if f in data:
             setattr(sched, f, data[f])

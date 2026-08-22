@@ -32,6 +32,11 @@ DB_PATH = os.path.join(DATA_DIR, "tutoring.db")
 CHROMA_PATH = os.getenv("EDU_CHROMA_PATH", os.path.join(DATA_DIR, "chroma_data"))
 UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
 EXPORT_DIR = os.path.join(DATA_DIR, "exports")
+# 日志与损坏隔离目录（P0 数据可靠性）：windowed exe 无控制台，文件日志是唯一排查通道
+LOG_DIR = os.getenv("EDU_LOG_DIR", os.path.join(DATA_DIR, "logs"))
+LOG_FILE = os.path.join(LOG_DIR, "app.log")
+# 启动自检发现损坏的 DB 先留证到 quarantine，再尝试自动恢复
+QUARANTINE_DIR = os.path.join(DATA_DIR, "quarantine")
 
 # 数据库连接 URL：优先环境变量（服务器可切 PostgreSQL），默认 SQLite
 DATABASE_URL = os.getenv("EDU_DATABASE_URL", f"sqlite:///{DB_PATH}")
@@ -41,6 +46,8 @@ os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(CHROMA_PATH, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(EXPORT_DIR, exist_ok=True)
+os.makedirs(LOG_DIR, exist_ok=True)
+os.makedirs(QUARANTINE_DIR, exist_ok=True)
 
 # 服务器配置：环境变量可覆盖（服务器绑 0.0.0.0），默认 127.0.0.1:8888
 HOST = os.getenv("EDU_HOST", "127.0.0.1")

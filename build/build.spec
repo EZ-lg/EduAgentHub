@@ -6,6 +6,7 @@
 - data/ 运行数据（SQLite/ChromaDB/uploads/exports）在 exe 同级，不打包
 """
 import os
+import sys
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 block_cipher = None
@@ -25,6 +26,8 @@ binaries = []
 hiddenimports = []
 
 # 动态加载/带数据文件的包：收集全部（子模块 + 数据 + 二进制）
+# 关键包收集失败必须中止打包（静默吞掉会产出"启动即崩"的 exe）
+CRITICAL_PKGS = {'chromadb', 'onnxruntime', 'fastapi', 'uvicorn', 'multipart'}
 for pkg in [
     'chromadb',           # 向量库：动态导入 + telemetry + 本地数据
     'onnxruntime',        # chromadb 默认 embedding 依赖
@@ -42,14 +45,30 @@ for pkg in [
         datas += d
         binaries += b
         hiddenimports += h
-    except Exception:
-        pass  # 个别包收集失败不阻塞
+    except Exception as e:
+        if pkg in CRITICAL_PKGS:
+            print(f"[FATAL] collect_all({pkg}) 失败: {e}")
+            sys.exit(1)
+        print(f"[WARN] collect_all({pkg}) 失败，已跳过: {e}")
 
 # 强制收集 backend 包全部子模块（uvicorn.run 用字符串引用 backend.app，静态分析收集不到）
 try:
-    hiddenimports += collect_submodules('backend')
-except Exception:
-    pass
+    backend_mods = collect_submodules('backend')
+except Exception as e:
+    print(f"[FATAL] collect_submodules('backend') 失败: {e}")
+    sys.exit(1)
+# 排除测试模块（backend.tests.*）：瘦身 + 减少打包噪音（构建不执行模块代码，无清库风险）
+hiddenimports += [m for m in backend_mods if not m.startswith('backend.tests')]
+
+# 断言 P0 数据可靠性关键模块已收集（漏打包 → windowed 下启动静默崩溃）
+_REQUIRED_UTILS = {
+    'backend.utils.db_health', 'backend.utils.migrate',
+    'backend.utils.logging_setup', 'backend.utils.backup',
+}
+_missing = _REQUIRED_UTILS - set(hiddenimports)
+if _missing:
+    print(f"[FATAL] P0 关键模块未收集，打包必然运行崩溃: {sorted(_missing)}")
+    sys.exit(1)
 
 a = Analysis(
     [MAIN_SCRIPT],

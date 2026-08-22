@@ -252,8 +252,8 @@ const app = createApp({
             if (resp.ok) {
                 const html = await resp.text();
                 document.getElementById('navbar-container').innerHTML = html;
-                const verEl = document.getElementById('navbar-version');
-                if (verEl) verEl.textContent = `v2.0 · build ${window.APP_VERSION || ''}`;
+                // innerHTML 注入的 <script> 不会执行，必须重建脚本节点让 updateNavActive 等注册到 window
+                executeInlineScripts(document.getElementById('navbar-container'));
             }
         } catch (err) {
             console.error('Navbar load error:', err);

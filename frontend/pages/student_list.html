@@ -186,7 +186,7 @@ function editStudent(id) {
                 } catch (e) { showToast('保存失败：' + e.message, 'error'); }
             },
         });
-    });
+    }).catch(e => showToast('加载学生失败：' + e.message, 'error'));
 }
 
 function deleteStudentConfirm(id) {

@@ -50,6 +50,29 @@ def _get_client() -> PersistentClient:
     return _client
 
 
+def close_client():
+    """best-effort 释放 ChromaDB PersistentClient 句柄（备份/迁移前调用）。
+
+    chromadb 0.5 无公开 close()，用 _system.stop() + clear_system_cache() + gc
+    释放底层文件句柄，否则 Windows 下无法覆盖/删除 chroma_data（PermissionError）。
+    失败不影响主流程：调用方对覆盖失败有降级（跳过 + 提示重建）。"""
+    global _client
+    with _client_lock:
+        if _client is None:
+            return
+        try:
+            _client._system.stop()
+        except Exception:
+            pass
+        try:
+            _client.clear_system_cache()
+        except Exception:
+            pass
+        _client = None
+    import gc
+    gc.collect()
+
+
 def _get_embedding_provider():
     """获取 embedding Provider；未配置/不支持向量 → 抛 503 可读错误"""
     emb = ai_manager.get_embedding()

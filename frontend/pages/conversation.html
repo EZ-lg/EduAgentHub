@@ -284,6 +284,9 @@ async function initConversationPage() {
         state.messages = d.conversation.messages || [];
         state.status = d.conversation.status;
         state.configured = d.configured;
+        // F5 整页刷新后再进入：会话已完成 → 直接展示完成态（含"生成报告"按钮），
+        // 避免 start 为已完成学科新建空 in_progress 会话冲掉总结
+        if (state.status === 'completed') { showCompleted(d.summary); return; }
         renderMessages();
         document.getElementById('conv-subtitle').textContent =
             d.configured ? `${d.student_name || ''} · 进行中` : 'AI 服务未配置';
