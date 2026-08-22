@@ -276,3 +276,8 @@ const app = createApp({
 app.use(router);
 app.component('ToastWidget', ToastComponent);
 app.mount('#app');
+
+// 心跳：告知后端"浏览器还开着"（配合设置页"关闭浏览器自动退出后台"）。
+// 浏览器标签一关，此 JS 停止 → 心跳中断 → 后端超时后自动退出进程，exe 即可安全删除。
+API.app.heartbeat().catch(() => {});
+setInterval(() => { API.app.heartbeat().catch(() => {}); }, 30000);

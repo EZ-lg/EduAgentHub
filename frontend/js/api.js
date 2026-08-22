@@ -233,4 +233,12 @@ window.API = {
         global() { return API.get('/api/overview'); },
         student(studentId) { return API.get(`/api/students/${studentId}/overview`); },
     },
+
+    // === 应用控制（退出/心跳/自动退出）===
+    app: {
+        heartbeat() { return API.post('/api/app/heartbeat', {}); },
+        exit() { return API.post('/api/app/exit', {}); },
+        autoExit() { return API.get('/api/app/auto-exit'); },
+        saveAutoExit(data) { return API.post('/api/app/auto-exit', data); },
+    },
 };

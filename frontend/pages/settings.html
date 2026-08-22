@@ -219,9 +219,16 @@
 
         <!-- 程序控制 -->
         <div class="panel">
-            <div class="panel-title"><svg class="icon"><use href="#icon-x-circle"/></svg> 程序控制 <span class="text-xs font-normal text-gray-400">退出后台服务</span></div>
-            <div class="mb-3 text-xs text-gray-500 leading-relaxed">
-                退出后后台服务停止、浏览器页面失效，届时可安全删除/替换本程序文件。
+            <div class="panel-title"><svg class="icon"><use href="#icon-x-circle"/></svg> 程序控制 <span class="text-xs font-normal text-gray-400">退出与后台管理</span></div>
+            <div class="mb-4 flex items-start justify-between gap-4">
+                <div>
+                    <div class="text-sm text-gray-700">关闭浏览器自动退出后台</div>
+                    <div class="text-xs text-gray-400 mt-0.5 leading-relaxed">关闭浏览器/标签后约 90 秒自动退出程序，便于安全删除/替换文件。<br>浏览器保持打开则不退出（可最小化）。</div>
+                </div>
+                <input type="checkbox" id="auto-exit-switch" class="mt-1 w-4 h-4" onchange="saveAutoExit()">
+            </div>
+            <div class="text-xs text-gray-500 mb-3 leading-relaxed">
+                也可手动退出：退出后后台服务停止、浏览器页面失效，届时可安全删除/替换本程序文件。
             </div>
             <button onclick="exitApp()" class="btn-outline" style="padding:6px 16px;font-size:13px;color:#ef4444;">
                 <svg class="icon icon--md"><use href="#icon-x-circle"/></svg> 退出程序
@@ -308,6 +315,7 @@ async function initSettings() {
     });
     loadBackups();
     loadHealth();
+    loadAutoExit();
 }
 
 async function loadSavedConfig() {
@@ -702,19 +710,39 @@ function importMigration(input) {
     });
 }
 
-/* ---------- 退出程序 ---------- */
+/* ---------- 退出程序 / 自动退出开关 ---------- */
 function exitApp() {
     Utils.confirmDialog({
         title: '退出程序',
-        message: '确定要退出教培智能体吗？退出后后台服务将停止、浏览器页面会失效，届时可安全删除/替换程序文件。',
+        message: '确定要退出教培智能体吗？退出后后台服务将停止，届时可安全删除/替换程序文件。',
         danger: true,
         onOk: async () => {
             try {
-                await API.post('/api/app/exit', {});
-                showToast('程序即将退出...', 'info');
+                // 先替换页面为退出提示，再请求退出（尽力让浏览器标签显示友好提示而非连接失败）
+                document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui,sans-serif;"><div style="text-align:center"><div style="font-size:18px;font-weight:600;color:#334155;margin-bottom:8px;">教培智能体</div><div style="color:#64748b;font-size:14px;">程序已退出，此页面可安全关闭。</div></div></div>';
+                await API.app.exit();
             } catch (e) { showToast('退出失败：' + (e.message || ''), 'error'); }
         },
     });
+}
+
+async function loadAutoExit() {
+    const el = document.getElementById('auto-exit-switch');
+    if (!el) return;
+    try {
+        const r = await API.app.autoExit();
+        if (r.success) el.checked = !!r.data.enabled;
+    } catch (e) { /* 读取失败沿用默认 */ }
+}
+
+async function saveAutoExit() {
+    const el = document.getElementById('auto-exit-switch');
+    if (!el) return;
+    try {
+        const r = await API.app.saveAutoExit({ enabled: el.checked });
+        if (r.success) showToast(el.checked ? '已开启：关闭浏览器自动退出' : '已关闭自动退出', 'success');
+        else showToast('设置失败：' + (r.error || ''), 'error');
+    } catch (e) { showToast('设置失败：' + e.message, 'error'); }
 }
 
 /* ---------- 教室管理 ---------- */
@@ -821,7 +849,7 @@ Object.assign(window, {
     switchSettingsTab, toggleKey, onLLMProviderChange, onEmbProviderChange,
     saveOrg, handleOrgLogo, clearOrgLogo, loadOrg,
     loadBackups, backupNow, loadHealth, downloadBackup, restoreBackup, deleteBackup,
-    exportMigration, importMigration, exitApp,
+    exportMigration, importMigration, exitApp, loadAutoExit, saveAutoExit,
     loadClassrooms, showClassroomModal, deleteClassroom,
 });
 })();

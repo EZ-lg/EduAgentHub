@@ -114,6 +114,9 @@ def create_app() -> FastAPI:
         # 建表/迁移成功后清除历史启动失败标记，避免手动恢复后仍被旧标记挡住
         from backend.utils.db_health import clear_startup_failed
         clear_startup_failed()
+        # 启动"关浏览器自动退出"守护线程（只在收到过心跳后启用超时判定，测试环境安全）
+        from backend.utils.heartbeat import start_monitor
+        start_monitor()
         from backend.utils.backup import backup_database  # 延迟导入避免循环
         try:
             backup_database()
