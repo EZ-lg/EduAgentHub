@@ -236,5 +236,6 @@ def check_and_repair_db() -> dict:
     )
     logger.critical("启动自检 fatal: %s", msg)
     _write_startup_failed(msg)
-    _popup(msg)
+    # 注意：弹窗由真实启动路径（app.py startup / main.py 护栏）负责，
+    # 这里不弹——否则测试模拟 fatal 场景也会弹窗干扰
     return {"status": "fatal", "message": msg}

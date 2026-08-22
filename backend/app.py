@@ -104,7 +104,10 @@ def create_app() -> FastAPI:
         from backend.utils.db_health import check_and_repair_db
         result = check_and_repair_db()
         if result["status"] == "fatal":
-            # 数据库损坏且无法自动恢复：阻止启动，绝不在坏库上继续写
+            # 数据库损坏且无法自动恢复：弹窗告知用户（windowed 无控制台，不能静默闪退），
+            # 然后阻止启动，绝不在坏库上继续写
+            from backend.utils.db_health import _popup
+            _popup(result["message"])
             raise RuntimeError(result["message"])
         init_db()
         # 建表/迁移成功后清除历史启动失败标记，避免手动恢复后仍被旧标记挡住
