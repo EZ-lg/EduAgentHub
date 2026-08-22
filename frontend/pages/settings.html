@@ -216,6 +216,17 @@
                 升级/换机须保留 <code class="text-gray-400">data/</code> 文件夹，数据 100% 本地不丢失。
             </div>
         </div>
+
+        <!-- 程序控制 -->
+        <div class="panel">
+            <div class="panel-title"><svg class="icon"><use href="#icon-x-circle"/></svg> 程序控制 <span class="text-xs font-normal text-gray-400">退出后台服务</span></div>
+            <div class="mb-3 text-xs text-gray-500 leading-relaxed">
+                退出后后台服务停止、浏览器页面失效，届时可安全删除/替换本程序文件。
+            </div>
+            <button onclick="exitApp()" class="btn-outline" style="padding:6px 16px;font-size:13px;color:#ef4444;">
+                <svg class="icon icon--md"><use href="#icon-x-circle"/></svg> 退出程序
+            </button>
+        </div>
     </div>
 
     <!-- ============ 教室管理 ============ -->
@@ -691,6 +702,21 @@ function importMigration(input) {
     });
 }
 
+/* ---------- 退出程序 ---------- */
+function exitApp() {
+    Utils.confirmDialog({
+        title: '退出程序',
+        message: '确定要退出教培智能体吗？退出后后台服务将停止、浏览器页面会失效，届时可安全删除/替换程序文件。',
+        danger: true,
+        onOk: async () => {
+            try {
+                await API.post('/api/app/exit', {});
+                showToast('程序即将退出...', 'info');
+            } catch (e) { showToast('退出失败：' + (e.message || ''), 'error'); }
+        },
+    });
+}
+
 /* ---------- 教室管理 ---------- */
 let classroomCache = [];
 async function loadClassrooms() {
@@ -795,7 +821,7 @@ Object.assign(window, {
     switchSettingsTab, toggleKey, onLLMProviderChange, onEmbProviderChange,
     saveOrg, handleOrgLogo, clearOrgLogo, loadOrg,
     loadBackups, backupNow, loadHealth, downloadBackup, restoreBackup, deleteBackup,
-    exportMigration, importMigration,
+    exportMigration, importMigration, exitApp,
     loadClassrooms, showClassroomModal, deleteClassroom,
 });
 })();
